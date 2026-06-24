@@ -1,0 +1,73 @@
+[
+  {
+    "stable_id": "R6-B7.2-TC01",
+    "release": "R6",
+    "sheet": "R6 - Master Campaign",
+    "source_row": 28,
+    "scenario_group": "B7.2 Add Master Campaign",
+    "case_no": 1,
+    "scenario": "Add Master Campaign",
+    "title": "Create Master Campaign with All Fields",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify that an admin user can create a new Master Campaign with complete basic information and target values.",
+    "precondition": "User is on the Master Campaign List Page. The Add Master Campaign button is visible.",
+    "steps": [
+      "User clicks the Add Master Campaign button.",
+      "The Add Master Campaign pop-up opens with an empty form, including Basic Information and Target sections.",
+      "User fills all required Basic Information fields with valid values, such as Master Campaign Name, Brand, Period, and Brief Description.",
+      "User fills all target fields, including Total Creator, Total Contents, Total Views, Total FYP, Total GMV, and Budget, with valid numeric values according to business rules.",
+      "User verifies that the Save button is enabled.",
+      "User clicks Save."
+    ],
+    "expected_result": [
+      "The system validates all basic information and target fields and finds no errors.",
+      "A new Master Campaign record is created in the system with all entered basic information and target values.",
+      "The pop-up closes, and the user is returned to the Master Campaign List Page.",
+      "The Master Campaign List Table refreshes and displays the newly created Master Campaign with the correct basic information and target values in the corresponding columns.",
+      "The new Master Campaign is available for further actions, such as open detail, edit, and allocation."
+    ],
+    "dependencies": [],
+    "source": {
+      "workbook": "../参考文档/Internal Testing for UAT Gro.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/50c30203-c861-49b2-828c-ceeda35b7820"
+    }
+  },
+  {
+    "stable_id": "R6-B7.1-TC01",
+    "release": "R6",
+    "sheet": "R6 - Master Campaign",
+    "source_row": 10,
+    "scenario_group": "B7.1 Master Campaign List Page",
+    "case_no": 1,
+    "scenario": "Search Bar",
+    "title": "Search by Master Campaign Name (Success)",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify that the Master Campaign list search can find an existing campaign by name and keep the search keyword visible.",
+    "precondition": "User is on the Master Campaign List Page. At least one master campaign named Summer Beauty Campaign 2024 exists in the table.",
+    "steps": [
+      "User focuses on the Search Bar at the top of the Master Campaign List Page.",
+      "User types Summer into the Search Bar.",
+      "User waits for the search to trigger, either automatically or by pressing Enter depending on design."
+    ],
+    "expected_result": [
+      "The Master Campaign List Table refreshes and displays only the Summer Beauty Campaign 2024 master campaign, and any other campaigns that match Summer by name if allowed by design.",
+      "The search keyword Summer remains visible in the Search Bar."
+    ],
+    "dependencies": [
+      {
+        "stable_id": "R6-B7.2-TC01",
+        "reason": "The search case needs an existing Master Campaign record."
+      }
+    ],
+    "source": {
+      "workbook": "../参考文档/Internal Testing for UAT Gro.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/58d3eff2-752d-4e39-90ba-12be65f1180e"
+    }
+  }
+]

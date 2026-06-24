@@ -1,0 +1,22 @@
+{
+  "release": "R6",
+  "title": "Master Campaign",
+  "prd": {
+    "path": "../参考文档/现有PRD/PRD - R6 Master Campaign.pdf",
+    "role": "business_context"
+  },
+  "test_case_source": {
+    "workbook": "../参考文档/Internal Testing for UAT Gro.xlsx",
+    "sheet": "R6 - Master Campaign",
+    "header_row": 8
+  },
+  "pilot_case_ids": [
+    "R6-B7.2-TC01",
+    "R6-B7.1-TC01"
+  ],
+  "notes": [
+    "Do not modify the original PRD or workbook.",
+    "Excel source rows are trace-only metadata, not stable case identifiers.",
+    "Historical Status/Evidence columns in the workbook are not reused as the new run result."
+  ]
+}

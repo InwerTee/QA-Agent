@@ -1,0 +1,34 @@
+node_modules/
+dist/
+coverage/
+*.log
+
+# Local secrets and machine state
+.env
+.DS_Store
+.~*
+
+# Historical local snapshot, not part of the new agent source.
+Version1/
+参考文档/
+
+# User-provided PRD/test-case packages are local runtime inputs.
+input-packages/
+**/input-packages/
+
+# Browser/test runtime outputs
+playwright-report/
+test-results/
+reports/runs/
+**/reports/runs/
+
+# Auth/session artifacts may contain tokens.
+storage-state/
+**/storage-state/
+playwright/.auth/
+
+# Local app/editor state
+.codex/
+.claude/
+.claude/settings.local.json
+.claude/state/
