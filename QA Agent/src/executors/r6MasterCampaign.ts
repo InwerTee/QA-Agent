@@ -85,7 +85,7 @@ async function createMasterCampaign(
       evidence_path: evidencePath,
       created_test_data: [createdData],
       depends_on_data: [],
-      notes: ["Executed with selectors and UI idioms ported from the verified Version1 R3+R6 flow."]
+      notes: ["Executed with selectors and UI idioms from a previously verified Gro UI flow."]
     };
   } catch (error) {
     return toBlockedResult(testCase, error, "Unable to complete Master Campaign creation.");

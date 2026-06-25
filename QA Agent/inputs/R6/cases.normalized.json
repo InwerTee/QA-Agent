@@ -1,44 +1,8 @@
 [
   {
-    "stable_id": "R6-B7.2-TC01",
-    "release": "R6",
-    "sheet": "R6 - Master Campaign",
-    "source_row": 28,
-    "scenario_group": "B7.2 Add Master Campaign",
-    "case_no": 1,
-    "scenario": "Add Master Campaign",
-    "title": "Create Master Campaign with All Fields",
-    "site": "admin",
-    "module": "Master Campaign",
-    "type": "Positive",
-    "intent": "Verify that an admin user can create a new Master Campaign with complete basic information and target values.",
-    "precondition": "User is on the Master Campaign List Page. The Add Master Campaign button is visible.",
-    "steps": [
-      "User clicks the Add Master Campaign button.",
-      "The Add Master Campaign pop-up opens with an empty form, including Basic Information and Target sections.",
-      "User fills all required Basic Information fields with valid values, such as Master Campaign Name, Brand, Period, and Brief Description.",
-      "User fills all target fields, including Total Creator, Total Contents, Total Views, Total FYP, Total GMV, and Budget, with valid numeric values according to business rules.",
-      "User verifies that the Save button is enabled.",
-      "User clicks Save."
-    ],
-    "expected_result": [
-      "The system validates all basic information and target fields and finds no errors.",
-      "A new Master Campaign record is created in the system with all entered basic information and target values.",
-      "The pop-up closes, and the user is returned to the Master Campaign List Page.",
-      "The Master Campaign List Table refreshes and displays the newly created Master Campaign with the correct basic information and target values in the corresponding columns.",
-      "The new Master Campaign is available for further actions, such as open detail, edit, and allocation."
-    ],
-    "dependencies": [],
-    "source": {
-      "workbook": "../参考文档/Internal Testing for UAT Gro.xlsx",
-      "historical_status": "Passed",
-      "historical_evidence": "https://jam.dev/c/50c30203-c861-49b2-828c-ceeda35b7820"
-    }
-  },
-  {
     "stable_id": "R6-B7.1-TC01",
     "release": "R6",
-    "sheet": "R6 - Master Campaign",
+    "sheet": "Sheet1",
     "source_row": 10,
     "scenario_group": "B7.1 Master Campaign List Page",
     "case_no": 1,
@@ -47,27 +11,1801 @@
     "site": "admin",
     "module": "Master Campaign",
     "type": "Positive",
-    "intent": "Verify that the Master Campaign list search can find an existing campaign by name and keep the search keyword visible.",
-    "precondition": "User is on the Master Campaign List Page. At least one master campaign named Summer Beauty Campaign 2024 exists in the table.",
+    "intent": "Verify Search Bar: Search by Master Campaign Name (Success).",
+    "precondition": "User is on the Master Campaign List Page. At least one master campaign named \"Summer Beauty Campaign 2024\" exists in the table.",
     "steps": [
       "User focuses on the Search Bar at the top of the Master Campaign List Page.",
-      "User types Summer into the Search Bar.",
-      "User waits for the search to trigger, either automatically or by pressing Enter depending on design."
+      "User types \"Summer\" into the Search Bar.",
+      "User waits for the search to trigger (auto or presses Enter, depending on design)."
     ],
     "expected_result": [
-      "The Master Campaign List Table refreshes and displays only the Summer Beauty Campaign 2024 master campaign, and any other campaigns that match Summer by name if allowed by design.",
-      "The search keyword Summer remains visible in the Search Bar."
+      "The Master Campaign List Table refreshes and displays only the \"Summer Beauty Campaign 2024\" master campaign (and any other campaigns that match \"Summer\" by name if allowed by design).",
+      "The search keyword \"Summer\" remains visible in the Search Bar."
     ],
     "dependencies": [
       {
         "stable_id": "R6-B7.2-TC01",
-        "reason": "The search case needs an existing Master Campaign record."
+        "reason": "This case needs an existing Master Campaign record; R6-B7.2-TC01 can create one during automated setup."
       }
     ],
+    "automation_status": "ready",
     "source": {
-      "workbook": "../参考文档/Internal Testing for UAT Gro.xlsx",
+      "workbook": "input-packages/R6-sample/R6.xlsx",
       "historical_status": "Passed",
       "historical_evidence": "https://jam.dev/c/58d3eff2-752d-4e39-90ba-12be65f1180e"
+    }
+  },
+  {
+    "stable_id": "R6-B7.1-TC02",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 11,
+    "scenario_group": "B7.1 Master Campaign List Page",
+    "case_no": 2,
+    "scenario": "Search Bar",
+    "title": "Search with No Results",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Negative",
+    "intent": "Verify Search Bar: Search with No Results.",
+    "precondition": "User is on the Master Campaign List Page. No master campaign name contains the term \"ZebraXylofon123\".",
+    "steps": [
+      "User focuses on the Search Bar.",
+      "User types \"ZebraXylofon123\" into the Search Bar.",
+      "User waits for the search to trigger (auto or presses Enter)."
+    ],
+    "expected_result": [
+      "The Master Campaign List Table updates to show no data rows.",
+      "An empty state message is shown, e.g., \"No results found matching your search.\"",
+      "The search keyword remains displayed so the user understands which term produced no results."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed"
+    }
+  },
+  {
+    "stable_id": "R6-B7.1-TC03",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 12,
+    "scenario_group": "B7.1 Master Campaign List Page",
+    "case_no": 3,
+    "scenario": "Filter",
+    "title": "Filter by Single Dropdown (Status)",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Filter: Filter by Single Dropdown (Status).",
+    "precondition": "User is on the Master Campaign List Page with: 10 Planning, 15 In Progress, and 5 Complete master campaigns.",
+    "steps": [
+      "User clicks the \"Filter\" button to open the Master Campaign List Filter pop-up.",
+      "In the Master Campaign Status dropdown, user selects \"In Progress\".",
+      "User clicks \"Apply\" in the filter pop-up."
+    ],
+    "expected_result": [
+      "The Master Campaign List Table refreshes to display only the 15 In Progress master campaigns.",
+      "The active filter state (Status = In Progress) is reflected in the filter UI (e.g., chip, tag, or shown in the Filter pop-up)."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/f622b884-50a5-4f06-a55a-d5d6114e86d9",
+      "historical_note": "https://applink.larksuite.com/client/todo/detail?guid=1cc90b6f-97a6-431f-bc13-88d2e0483758&suite_entity_num=t100228\n\nhttps://applink.larksuite.com/client/todo/detail?guid=b21f5eeb-2531-4b6e-bfea-2a4b439f23e1&suite_entity_num=t100235"
+    }
+  },
+  {
+    "stable_id": "R6-B7.1-TC04",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 13,
+    "scenario_group": "B7.1 Master Campaign List Page",
+    "case_no": 4,
+    "scenario": "Filter",
+    "title": "Filter by Multi-Select Dropdowns",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Filter: Filter by Multi-Select Dropdowns.",
+    "precondition": "User is on the Master Campaign List Page. Master campaigns exist with various Brands and different Progress Views values.",
+    "steps": [
+      "User clicks the \"Filter\" button.",
+      "In the Brand dropdown (multiselect), user selects \"Wardah\" and \"Emina\".",
+      "In the Progress Views filter fields, user enters a minimum and maximum numeric value (e.g., Min = 10,000; Max = 50,000).",
+      "User clicks \"Apply\"."
+    ],
+    "expected_result": [
+      "The Master Campaign List Table refreshes to display only master campaigns where:• Brand is Wardah OR Emina, and• Progress Views is between the specified Min and Max values (inclusive, based on design).",
+      "No campaigns outside these conditions are shown.",
+      "Filter indicators show that Brand and Progress Views filters are active."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/5695e8fb-6946-438e-b830-f7917632b453"
+    }
+  },
+  {
+    "stable_id": "R6-B7.1-TC05",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 14,
+    "scenario_group": "B7.1 Master Campaign List Page",
+    "case_no": 5,
+    "scenario": "Filter",
+    "title": "Filter by Date Range (Created Date)",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Filter: Filter by Date Range (Created Date).",
+    "precondition": "User is on the Master Campaign List Page with master campaigns created yesterday and master campaigns created last month.",
+    "steps": [
+      "User clicks the \"Filter\" button.",
+      "In the Created Date date range filter, user selects a range that covers only yesterday.",
+      "User clicks \"Apply\"."
+    ],
+    "expected_result": [
+      "The Master Campaign List Table refreshes to display only master campaigns whose Created Date falls within the selected range (yesterday).",
+      "Campaigns created last month or outside that date range are not visible.",
+      "The selected Created Date range appears in the filter UI as active."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_note": "https://applink.larksuite.com/client/todo/detail?guid=464a8184-2c58-488f-bbd3-cdd95a20d485&suite_entity_num=t100229\n\nhttps://applink.larksuite.com/client/todo/detail?guid=293ff373-6832-4b38-8ea8-24e2c73ea590&suite_entity_num=t100038"
+    }
+  },
+  {
+    "stable_id": "R6-B7.1-TC06",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 15,
+    "scenario_group": "B7.1 Master Campaign List Page",
+    "case_no": 6,
+    "scenario": "Filter",
+    "title": "Reset Filter",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Filter: Reset Filter.",
+    "precondition": "User is on the Master Campaign List Filter pop-up and has set at least one filter, e.g., Brand = Wardah.",
+    "steps": [
+      "User opens the Filter pop-up (if not already open).",
+      "User clicks the \"Reset\" button in the filter pop-up.",
+      "User clicks \"Apply\" (if required by design to confirm reset)."
+    ],
+    "expected_result": [
+      "All filter fields in the pop-up (e.g., Brand, Status, Created Date, Progress metrics) are cleared and return to their default empty state.",
+      "The Master Campaign List Table refreshes to show unfiltered results (default view)."
+    ],
+    "dependencies": [
+      {
+        "stable_id": "R6-B7.2-TC01",
+        "reason": "This case needs an existing Master Campaign record; R6-B7.2-TC01 can create one during automated setup."
+      }
+    ],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/2cec69c3-f476-4ae9-8f7d-6e58f0493121"
+    }
+  },
+  {
+    "stable_id": "R6-B7.1-TC07",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 16,
+    "scenario_group": "B7.1 Master Campaign List Page",
+    "case_no": 7,
+    "scenario": "Filter",
+    "title": "Filter with No Results",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Negative",
+    "intent": "Verify Filter: Filter with No Results.",
+    "precondition": "User is on the Master Campaign List Page. There are no master campaigns with Brand \"Make Over\".",
+    "steps": [
+      "User clicks the \"Filter\" button.",
+      "In the Brand dropdown, user selects \"Make Over\".",
+      "User clicks \"Apply\"."
+    ],
+    "expected_result": [
+      "The Master Campaign List Table updates to show no rows.",
+      "An empty state message appears, e.g., \"No results found matching your filters.\"",
+      "The filter state (Brand = Make Over) remains visible so the user understands why no data is shown."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed"
+    }
+  },
+  {
+    "stable_id": "R6-B7.1-TC08",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 17,
+    "scenario_group": "B7.1 Master Campaign List Page",
+    "case_no": 8,
+    "scenario": "Column Settings",
+    "title": "Hide a Column",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Column Settings: Hide a Column.",
+    "precondition": "User is on the Master Campaign List Page and the \"Updated Date\" column is currently visible in the table.",
+    "steps": [
+      "User clicks the \"Column Settings\" button to open the column settings pop-up.",
+      "In the Column List, user finds the \"Updated Date\" field.",
+      "User toggles \"Updated Date\" to Hide (e.g., turns off the switch).",
+      "User clicks \"Save\" in the column settings pop-up."
+    ],
+    "expected_result": [
+      "The column settings pop-up closes.",
+      "The Master Campaign List Table refreshes without the \"Updated Date\" column visible.",
+      "All other columns remain unchanged, and the new layout is applied."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/797c0689-c5b1-4842-85ae-93b3fcc3abd3"
+    }
+  },
+  {
+    "stable_id": "R6-B7.1-TC09",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 18,
+    "scenario_group": "B7.1 Master Campaign List Page",
+    "case_no": 9,
+    "scenario": "Column Settings",
+    "title": "Reorder Columns",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Column Settings: Reorder Columns.",
+    "precondition": "User is on the Master Campaign List Page. Currently: Brand is column 3, Associated Product is column 4, and Period is column 5.",
+    "steps": [
+      "User clicks the \"Column Settings\" button.",
+      "In the Column List, user drags the \"Period\" column item and drops it above \"Brand\" using the reorder handle.",
+      "User clicks \"Save\"."
+    ],
+    "expected_result": [
+      "The column settings pop-up closes.",
+      "The Master Campaign List Table refreshes with the new column order as configured, e.g.:• Column 3: Period• Column 4: Brand• Column 5: Associated Product (adjust according to agreed order)."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed"
+    }
+  },
+  {
+    "stable_id": "R6-B7.1-TC10",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 19,
+    "scenario_group": "B7.1 Master Campaign List Page",
+    "case_no": 10,
+    "scenario": "Column Settings",
+    "title": "Reset Columns to Default",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Column Settings: Reset Columns to Default.",
+    "precondition": "User has previously customized the table layout (e.g., hidden \"Updated Date\" or reordered columns) from the default configuration.",
+    "steps": [
+      "User clicks the \"Column Settings\" button.",
+      "In the pop-up, user clicks \"Reset\" to restore default settings.",
+      "User clicks \"Save\"."
+    ],
+    "expected_result": [
+      "The column settings pop-up closes.",
+      "The Master Campaign List Table refreshes to its default column set and order (e.g., with \"Updated Date\" visible again and standard column ordering)."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_note": "https://applink.larksuite.com/client/todo/detail?guid=ed626fda-6c97-45eb-bf0d-7f5b1c35d06d&suite_entity_num=t100230"
+    }
+  },
+  {
+    "stable_id": "R6-B7.1-TC11",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 20,
+    "scenario_group": "B7.1 Master Campaign List Page",
+    "case_no": 11,
+    "scenario": "Column Settings",
+    "title": "Cancel Action (Do Not Apply Changes)",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Negative",
+    "intent": "Verify Column Settings: Cancel Action (Do Not Apply Changes).",
+    "precondition": "User is on the Master Campaign List Page. Table currently shows \"Associated Product\" column.",
+    "steps": [
+      "User clicks the \"Column Settings\" button.",
+      "User toggles \"Associated Product\" to hidden (or makes any other changes).",
+      "Instead of clicking Save, user clicks \"Cancel\"."
+    ],
+    "expected_result": [
+      "The column settings pop-up closes.",
+      "The Master Campaign List Table remains unchanged: \"Associated Product\" and other columns are displayed exactly as before opening Column Settings.",
+      "No layout changes are applied."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed"
+    }
+  },
+  {
+    "stable_id": "R6-B7.1-TC12",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 21,
+    "scenario_group": "B7.1 Master Campaign List Page",
+    "case_no": 12,
+    "scenario": "Data Display",
+    "title": "Verify Data Display for Default Columns",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Data Display: Verify Data Display for Default Columns.",
+    "precondition": "User is on the Master Campaign List Page with existing master campaigns populated and default columns enabled.",
+    "steps": [
+      "User looks at any row in the Master Campaign List Table.",
+      "User scrolls horizontally if needed to see all default columns."
+    ],
+    "expected_result": [
+      "Each row correctly displays values for all default columns, such as:",
+      "• Master Campaign Name",
+      "• Status",
+      "• Brand",
+      "• Associated Product",
+      "• Period",
+      "• Total Budget",
+      "• Budget Usage",
+      "• Progress Contents",
+      "• Progress Creator",
+      "• Progress Views",
+      "• Progress FYP",
+      "• AVG CPV",
+      "• AVG ER",
+      "• Progress GMV",
+      "• RO",
+      "• Created By",
+      "• Created Time",
+      "• Updated Time / Updated Date.",
+      "Data in each column is consistent with the underlying records and formatting rules."
+    ],
+    "dependencies": [
+      {
+        "stable_id": "R6-B7.2-TC01",
+        "reason": "This case needs an existing Master Campaign record; R6-B7.2-TC01 can create one during automated setup."
+      }
+    ],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/6663974b-58bc-44b0-a3bf-bd67a15ac3bd"
+    }
+  },
+  {
+    "stable_id": "R6-B7.1-TC13",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 22,
+    "scenario_group": "B7.1 Master Campaign List Page",
+    "case_no": 13,
+    "scenario": "Pagination",
+    "title": "Navigate using “Next” Button",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Pagination: Navigate using “Next” Button.",
+    "precondition": "User is on the Master Campaign List Page, viewing Page 1 of 10 (multiple pages of data exist).",
+    "steps": [
+      "User looks at the pagination controls at the bottom of the table.",
+      "User clicks the \">\" (Next) button."
+    ],
+    "expected_result": [
+      "The Master Campaign List Table refreshes to display the items for Page",
+      "The pagination indicator updates to reflect the new current page (e.g., \"Page 2 of 10\")."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/777118ab-aff5-4e9f-b12e-aa1690d483e5"
+    }
+  },
+  {
+    "stable_id": "R6-B7.1-TC14",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 23,
+    "scenario_group": "B7.1 Master Campaign List Page",
+    "case_no": 14,
+    "scenario": "Pagination",
+    "title": "Navigate using “Go to Page” Input",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Pagination: Navigate using “Go to Page” Input.",
+    "precondition": "User is on the Master Campaign List Page, currently viewing Page 1 of 10. A \"Go to\" page input is available.",
+    "steps": [
+      "User focuses on the \"Go to\" page input box near the pagination controls.",
+      "User types \"8\" into the input field.",
+      "User clicks \"Go\" or presses Enter (depending on design)."
+    ],
+    "expected_result": [
+      "The Master Campaign List Table refreshes to display the items for Page",
+      "The pagination indicator updates to show that the current page is 8 (e.g., \"Page 8 of 10\")."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed"
+    }
+  },
+  {
+    "stable_id": "R6-B7.1-TC15",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 24,
+    "scenario_group": "B7.1 Master Campaign List Page",
+    "case_no": 15,
+    "scenario": "Pagination / Empty State",
+    "title": "Page Initial Empty State (No Campaigns)",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Negative",
+    "intent": "Verify Pagination / Empty State: Page Initial Empty State (No Campaigns).",
+    "precondition": "A new user logs in and navigates to the Master Campaign List Page. There are no master campaigns created in the system.",
+    "steps": [
+      "User navigates to the Master Campaign List Page.",
+      "User waits for the page to finish loading."
+    ],
+    "expected_result": [
+      "The system displays an Empty State UI (e.g., message like \"No master campaigns yet\" with optional CTA to create one).",
+      "The data table and pagination controls are not visible, or are disabled according to design."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed"
+    }
+  },
+  {
+    "stable_id": "R6-B7.1-TC16",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 25,
+    "scenario_group": "B7.1 Master Campaign List Page",
+    "case_no": 16,
+    "scenario": "Pagination",
+    "title": "“Next” / “Previous” Button Disabled State",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Negative",
+    "intent": "Verify Pagination: “Next” / “Previous” Button Disabled State.",
+    "precondition": "User is on the Master Campaign List Page, and there is only 1 page of results (e.g., 7 campaigns, Rows Per Page = 10).",
+    "steps": [
+      "User views the pagination controls at the bottom of the table."
+    ],
+    "expected_result": [
+      "Both the \"<\" (Previous) and \">\" (Next) buttons are disabled, indicating there are no additional pages.",
+      "The current page is shown as Page 1 of 1 (or equivalent)."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/e9e579fa-047c-4ec0-a2a0-c1f926db447d"
+    }
+  },
+  {
+    "stable_id": "R6-B7.1-TC17",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 26,
+    "scenario_group": "B7.1 Master Campaign List Page",
+    "case_no": 17,
+    "scenario": "Pagination",
+    "title": "Invalid “Go to Page” Input (Out of Range)",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Negative",
+    "intent": "Verify Pagination: Invalid “Go to Page” Input (Out of Range).",
+    "precondition": "User is on the Master Campaign List Page. Total number of pages is 10.",
+    "steps": [
+      "User focuses on the \"Go to\" page input field.",
+      "User types \"11\" (a value greater than the total pages).",
+      "User clicks \"Go\" or presses Enter."
+    ],
+    "expected_result": [
+      "The system either:",
+      "• Shows an error/validation message (e.g., \"Page number must be between 1 and 10\"), or",
+      "• Silently ignores the request and keeps the user on the current page (according to agreed design).",
+      "The table does not navigate to a non-existent page, and no error state (e.g., blank table) is produced by the invalid input."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed"
+    }
+  },
+  {
+    "stable_id": "R6-B7.2-TC01",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 28,
+    "scenario_group": "B7.2 Add Master Campaign",
+    "case_no": 1,
+    "scenario": "Add Master Campaign",
+    "title": "Create Master Campaign with All Fields",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Add Master Campaign: Create Master Campaign with All Fields.",
+    "precondition": "User is on the Master Campaign List Page. The \"Add Master Campaign\" button is visible.",
+    "steps": [
+      "User clicks the \"Add Master Campaign\" button.",
+      "The \"Add Master Campaign\" pop-up opens with an empty form (Basic Information and Target sections).",
+      "User fills all required Basic Information fields with valid values (e.g., Master Campaign Name, Brand, Period, Brief Description, etc.).",
+      "User fills all target fields (Total Creator, Total Contents, Total Views, Total FYP, Total GMV, Budget) with valid numeric values according to business rules.",
+      "User verifies that the Save button is enabled.",
+      "User clicks \"Save\"."
+    ],
+    "expected_result": [
+      "The system validates all basic information and target fields and finds no errors.",
+      "A new Master Campaign record is created in the system with all the entered data (basic info + targets).",
+      "The pop-up closes, and the user is returned to the Master Campaign List Page.",
+      "The Master Campaign List Table refreshes and displays the newly created Master Campaign with the correct basic information and target values in the corresponding columns.",
+      "The new Master Campaign is available for further actions (e.g., open detail, edit, allocation)."
+    ],
+    "dependencies": [],
+    "automation_status": "ready",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/50c30203-c861-49b2-828c-ceeda35b7820",
+      "historical_note": "https://applink.larksuite.com/client/todo/detail?guid=bf52a781-0264-496b-bc88-a38dad73e3a9&suite_entity_num=t100039\n\nhttps://applink.larksuite.com/client/todo/detail?guid=f82c8d00-8c2a-4b19-8ad5-fffec83a4bae&suite_entity_num=t100046"
+    }
+  },
+  {
+    "stable_id": "R6-B7.2-TC02",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 29,
+    "scenario_group": "B7.2 Add Master Campaign",
+    "case_no": 2,
+    "scenario": "Add Master Campaign",
+    "title": "Create Master Campaign with Only Required Targets",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Add Master Campaign: Create Master Campaign with Only Required Targets.",
+    "precondition": "User is on the Master Campaign List Page. The \"Add Master Campaign\" button is visible. System allows some target fields to be optional or zero.",
+    "steps": [
+      "User clicks the \"Add Master Campaign\" button.",
+      "The \"Add Master Campaign\" pop-up opens with an empty form.",
+      "User fills all required Basic Information fields with valid values.",
+      "User fills only required target fields with valid numeric values (if any) and leaves some non-required target fields as zero or blank, according to allowed rules (e.g., leaves Total FYP or CPV-related target as 0 if optional).",
+      "User verifies the Save button is enabled.",
+      "User clicks \"Save\"."
+    ],
+    "expected_result": [
+      "The system validates the form and accepts zero/blank values for non-required target fields according to business rules.",
+      "A new Master Campaign is created with all basic information and stored target values, including any zero targets as valid entries.",
+      "The pop-up closes and the Master Campaign List Table refreshes.",
+      "The new Master Campaign appears in the list with correct basic information and target columns showing either the entered numbers or 0 where targets were intentionally left as zero.",
+      "These zero targets are available for later tracking and can be updated in future edits if needed."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/71bb2cba-ed0e-4245-8a24-b6b604fe6b0b"
+    }
+  },
+  {
+    "stable_id": "R6-B7.2-TC03",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 30,
+    "scenario_group": "B7.2 Add Master Campaign",
+    "case_no": 3,
+    "scenario": "Add Master Campaign",
+    "title": "Missing Required Basic Information",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Negative",
+    "intent": "Verify Add Master Campaign: Missing Required Basic Information.",
+    "precondition": "User is on the Master Campaign List Page. The \"Add Master Campaign\" button is visible.",
+    "steps": [
+      "User clicks the \"Add Master Campaign\" button.",
+      "The \"Add Master Campaign\" pop-up opens with an empty form.",
+      "User fills some fields, but leaves at least one required Basic Information field empty (e.g., leaves Master Campaign Name, Brand, or Period blank).",
+      "User attempts to move focus away or reach the end of the form, without completing all required fields.",
+      "User checks the Save button state."
+    ],
+    "expected_result": [
+      "The system validation detects that one or more required Basic Information fields are missing/empty.",
+      "The Save button remains disabled and cannot be clicked to submit the form.",
+      "No submit-level toast/modal is triggered because the form is not allowed to be submitted in an invalid state.",
+      "The Master Campaign is not created until all required basic information fields are correctly filled, at which point the Save button becomes enabled.",
+      "If inline validation is implemented, required fields may be visually marked (e.g., red outline or error text) to guide the user."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed"
+    }
+  },
+  {
+    "stable_id": "R6-B7.2-TC04",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 31,
+    "scenario_group": "B7.2 Add Master Campaign",
+    "case_no": 4,
+    "scenario": "Add Master Campaign",
+    "title": "Invalid Numeric Input in Target Fields",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Negative",
+    "intent": "Verify Add Master Campaign: Invalid Numeric Input in Target Fields.",
+    "precondition": "User is on the Master Campaign List Page. The \"Add Master Campaign\" button is visible. Target fields are implemented as numeric-only inputs (e.g., Total Views, Total GMV, Budget).",
+    "steps": [
+      "User clicks the \"Add Master Campaign\" button.",
+      "The \"Add Master Campaign\" pop-up opens.",
+      "User focuses on a numeric target field, such as Total Views, Total GMV, or Budget.",
+      "User attempts to type non-numeric characters into the numeric field (e.g., letters \"abc\", symbols like \"@#$\", or other characters that are not allowed, except formatting like \",\" or \".\" if supported).",
+      "User observes the input behavior while typing these characters."
+    ],
+    "expected_result": [
+      "Any non-numeric characters entered into numeric target fields are ignored and do not appear in the input field (except allowed numeric formatting such as \",\" or \".\" if supported by design).",
+      "The field continues to contain only valid numeric content (e.g., \"1000000\" or \"1,000,000\").",
+      "The system therefore stores and processes only valid numeric values for target fields during Master Campaign creation.",
+      "No error message is required for typing non-numeric characters because the system prevents invalid characters from being entered in the first place."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/5730a776-6709-4b02-a7c3-ec0307a5d55e"
+    }
+  },
+  {
+    "stable_id": "R6-B7.3-TC01",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 33,
+    "scenario_group": "B7.3 Edit Master Campaign",
+    "case_no": 1,
+    "scenario": "Edit Master Campaign",
+    "title": "Edit Basic Information Only",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Edit Master Campaign: Edit Basic Information Only.",
+    "precondition": "Master Campaign \"Summer Beauty Campaign 2024\" exists and is accessible. User is on the Master Campaign Detail page for this campaign. The \"Edit Master Campaign\" button is visible.",
+    "steps": [
+      "User clicks \"Edit Master Campaign\" on the Master Campaign Detail page.",
+      "The \"Edit Master Campaign\" pop-up opens with all current Basic Information and Target fields pre-filled.",
+      "In the Basic Information section, user updates only non-target fields (e.g., changes Brief Description, uploads/changes an image).",
+      "User does not change any target fields (Total GMV, Total Views, etc.).",
+      "User confirms that the Update button is enabled.",
+      "User clicks \"Update\"."
+    ],
+    "expected_result": [
+      "The system saves changes to Basic Information only.",
+      "The pop-up closes and the user is returned to the Master Campaign Detail page.",
+      "The \"Detail\" Master Campaign section shows the updated Basic Information (e.g., the new Brief Description and image).",
+      "All target values in Dashboard Overview and the \"Target\" section of Pillar Contribution remain unchanged from their previous values.",
+      "The Updated Date / Update Information shown in Dashboard Overview, Pillar Contribution, and the Updated Date column in the Master Campaign List is refreshed to the latest timestamp."
+    ],
+    "dependencies": [
+      {
+        "stable_id": "R6-B7.2-TC01",
+        "reason": "This case needs an existing Master Campaign record; R6-B7.2-TC01 can create one during automated setup."
+      }
+    ],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/6ea4916f-913a-4e32-9ea6-27d2bf5aa4a3"
+    }
+  },
+  {
+    "stable_id": "R6-B7.3-TC02",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 34,
+    "scenario_group": "B7.3 Edit Master Campaign",
+    "case_no": 2,
+    "scenario": "Edit Master Campaign",
+    "title": "Edit Targets Only (Success)",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Edit Master Campaign: Edit Targets Only (Success).",
+    "precondition": "An existing Master Campaign with initial targets already set. User is on that campaign's Master Campaign Detail page.",
+    "steps": [
+      "User clicks \"Edit Master Campaign\" on the Master Campaign Detail page.",
+      "The \"Edit Master Campaign\" pop-up opens with the current Basic Information and Target fields pre-filled.",
+      "User leaves all Basic Information fields unchanged (e.g., Name, Brand, Period, Brief Description).",
+      "User updates one or more Target fields (e.g., changes Total Views and Budget to new numeric values).",
+      "User confirms that the Update button is enabled.",
+      "User clicks \"Update\"."
+    ],
+    "expected_result": [
+      "The system saves the new Target values for the Master Campaign.",
+      "The pop-up closes and the Master Campaign Detail page is refreshed.",
+      "The \"Detail\" Master Campaign section shows the same Basic Information as before (no change).",
+      "The updated targets are correctly reflected in Dashboard Overview (e.g., new Target values appear in the KPI cards) and in the \"Target\" section of Pillar Contribution for the Master Campaign.",
+      "The Updated Date / Update Information fields in Dashboard Overview, Pillar Contribution, and the Updated Date column in the Master Campaign List show the new latest timestamp for this change."
+    ],
+    "dependencies": [
+      {
+        "stable_id": "R6-B7.2-TC01",
+        "reason": "This case needs an existing Master Campaign record; R6-B7.2-TC01 can create one during automated setup."
+      }
+    ],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed"
+    }
+  },
+  {
+    "stable_id": "R6-B7.3-TC03",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 35,
+    "scenario_group": "B7.3 Edit Master Campaign",
+    "case_no": 3,
+    "scenario": "Edit Master Campaign",
+    "title": "Edit Basic Information and Targets",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Edit Master Campaign: Edit Basic Information and Targets.",
+    "precondition": "An existing Master Campaign with Basic Information and Targets already configured. User is on that campaign's Master Campaign Detail page.",
+    "steps": [
+      "User clicks \"Edit Master Campaign\" on the Master Campaign Detail page.",
+      "The \"Edit Master Campaign\" pop-up opens with current Basic Information and Target values pre-filled.",
+      "User updates one or more Basic Information fields (e.g., changes Period, edits Brief Description).",
+      "User also updates one or more Target fields (e.g., Total GMV, Total Creator).",
+      "User verifies that the Update button is enabled after all required fields remain valid.",
+      "User clicks \"Update\"."
+    ],
+    "expected_result": [
+      "The system saves both Basic Information changes and Target changes for the Master Campaign.",
+      "The pop-up closes and the Master Campaign Detail page reloads.",
+      "The \"Detail\" Master Campaign section displays the updated Basic Information (e.g., new Period and updated Brief Description).",
+      "The new Target values are correctly shown in Dashboard Overview (KPI Targets) and in the \"Target\" section of Pillar Contribution for this Master Campaign.",
+      "The Updated Date / Update Information is updated across Dashboard Overview, Pillar Contribution, and the Master Campaign List to reflect the latest edit time."
+    ],
+    "dependencies": [
+      {
+        "stable_id": "R6-B7.2-TC01",
+        "reason": "This case needs an existing Master Campaign record; R6-B7.2-TC01 can create one during automated setup."
+      }
+    ],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed"
+    }
+  },
+  {
+    "stable_id": "R6-B7.3-TC04",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 36,
+    "scenario_group": "B7.3 Edit Master Campaign",
+    "case_no": 4,
+    "scenario": "Edit Master Campaign",
+    "title": "Required Field Empty",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Negative",
+    "intent": "Verify Edit Master Campaign: Required Field Empty.",
+    "precondition": "An existing Master Campaign is available. User is on the Master Campaign Detail page and can open the \"Edit Master Campaign\" pop-up.",
+    "steps": [
+      "User clicks \"Edit Master Campaign\" on the Master Campaign Detail page.",
+      "The \"Edit Master Campaign\" pop-up opens with current data pre-filled.",
+      "User clears at least one required Basic Information field (e.g., deletes the Master Campaign Name, or clears the Brand or Period field).",
+      "User moves focus away or attempts to proceed without refilling the required field.",
+      "User checks the state of the Update button."
+    ],
+    "expected_result": [
+      "The system validation detects that a required Basic Information field is empty",
+      ".",
+      "The Update button becomes or remains disabled, preventing the user from submitting the form.",
+      "No changes are saved while the form is in an invalid state; clicking around does not update the Master Campaign.",
+      "The Master Campaign Detail page (outside the pop-up) continues to show the old Basic Information and Targets.",
+      "The values in Dashboard Overview and Pillar Contribution remain as before (no target changes).",
+      "The Updated Date / Update Information on Dashboard Overview, Pillar Contribution, and in the Master Campaign List are not updated."
+    ],
+    "dependencies": [
+      {
+        "stable_id": "R6-B7.2-TC01",
+        "reason": "This case needs an existing Master Campaign record; R6-B7.2-TC01 can create one during automated setup."
+      }
+    ],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed"
+    }
+  },
+  {
+    "stable_id": "R6-B7.3-TC05",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 37,
+    "scenario_group": "B7.3 Edit Master Campaign",
+    "case_no": 5,
+    "scenario": "Add Master Campaign",
+    "title": "Invalid Numeric Input in Target Fields",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Negative",
+    "intent": "Verify Add Master Campaign: Invalid Numeric Input in Target Fields.",
+    "precondition": "User is on the Master Campaign List Page. The \"Add Master Campaign\" pop-up can be opened and contains numeric target fields (e.g., Total Views, Total GMV, Budget).",
+    "steps": [
+      "User clicks \"Add Master Campaign\" to open the add pop-up.",
+      "The \"Add Master Campaign\" pop-up opens with empty fields.",
+      "User focuses on a numeric target field, such as Total Views, Total GMV, or Budget.",
+      "User attempts to type non-numeric characters into the field (e.g., letters \"abc\", symbols like \"@#$\"), excluding valid numeric formatting such as \",\" or \".\" if supported.",
+      "User observes the field behavior while entering these characters."
+    ],
+    "expected_result": [
+      "The system rejects non-numeric characters in numeric fields: letters and unsupported symbols are ignored and do not appear in the input.",
+      "Only valid numeric characters (and optionally allowed separators like \",\" or \".\") are accepted and visible in the target fields.",
+      "As a result, only valid numeric values are stored and used when creating the Master Campaign.",
+      "The user cannot accidentally submit alphabetic or invalid characters in any numeric target fields, reducing the risk of data quality issues."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed"
+    }
+  },
+  {
+    "stable_id": "R6-B7.4-TC01",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 39,
+    "scenario_group": "B7.4 Allocate Master Campaign Target",
+    "case_no": 1,
+    "scenario": "Add/Edit Allocation",
+    "title": "Open Add Allocation (No Existing Allocation)",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Add/Edit Allocation: Open Add Allocation (No Existing Allocation).",
+    "precondition": "A Master Campaign exists with master targets defined (GMV, Views, Contents, Creators, FYP, Budget), but no allocation data has been saved yet. User is on the Master Campaign Detail Dashboard.",
+    "steps": [
+      "User navigates to the Pillar Contribution section of the Master Campaign Detail Dashboard.",
+      "User clicks the \"Add/Edit Allocation\" action/button.",
+      "The \"Add/Edit Allocation – Master Campaign\" pop-up opens."
+    ],
+    "expected_result": [
+      "The Total (Master Target) row shows the master targets per metric (GMV, Views, Contents, Creators, FYP, Budget) exactly as configured in the Master Campaign targets.",
+      "The Total Allocation row shows 0 for all metrics (no allocation yet).",
+      "The Remaining Target row shows values equal to the Master Target for each metric (Master Target – 0 = Master Target).",
+      "Allocation fields per pillar are empty or 0 according to design, indicating no allocation has been made."
+    ],
+    "dependencies": [
+      {
+        "stable_id": "R6-B7.2-TC01",
+        "reason": "This case needs an existing Master Campaign record; R6-B7.2-TC01 can create one during automated setup."
+      }
+    ],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/46eadacf-1265-4e0a-9549-c385f2470d6c",
+      "historical_note": "https://applink.larksuite.com/client/todo/detail?guid=a3fead6f-f4b7-4fe3-beef-ab7a5549c875&suite_entity_num=t100231"
+    }
+  },
+  {
+    "stable_id": "R6-B7.4-TC02",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 40,
+    "scenario_group": "B7.4 Allocate Master Campaign Target",
+    "case_no": 2,
+    "scenario": "Add/Edit Allocation",
+    "title": "Open Edit Allocation (Existing Allocation)",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Add/Edit Allocation: Open Edit Allocation (Existing Allocation).",
+    "precondition": "A Master Campaign exists with master targets and at least one saved allocation per pillar. User is on the Master Campaign Detail Dashboard.",
+    "steps": [
+      "User goes to the Pillar Contribution section.",
+      "User clicks the \"Add/Edit Allocation\" action/button.",
+      "The \"Add/Edit Allocation – Master Campaign\" pop-up opens."
+    ],
+    "expected_result": [
+      "Each pillar row in the allocation table is pre-filled with the latest saved allocation values for all metrics (GMV, Views, Contents, Creators, FYP, Budget, etc.).",
+      "The Total Allocation row displays the sum of all pillar allocations for each metric.",
+      "The Remaining Target row displays Master Target – Total Allocation for each metric.",
+      "All displayed values are consistent with previously saved allocation data."
+    ],
+    "dependencies": [
+      {
+        "stable_id": "R6-B7.2-TC01",
+        "reason": "This case needs an existing Master Campaign record; R6-B7.2-TC01 can create one during automated setup."
+      }
+    ],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/2877af5a-8fb1-4ea9-8b82-b9283c745234"
+    }
+  },
+  {
+    "stable_id": "R6-B7.4-TC03",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 41,
+    "scenario_group": "B7.4 Allocate Master Campaign Target",
+    "case_no": 3,
+    "scenario": "Add/Edit Allocation",
+    "title": "Save Allocation Successfully",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Add/Edit Allocation: Save Allocation Successfully.",
+    "precondition": "A Master Campaign exists. The \"Add/Edit Allocation\" pop-up is open with valid allocation values entered for all pillars. For every metric, Remaining Target ≥ 0.",
+    "steps": [
+      "In the \"Add/Edit Allocation\" pop-up, user reviews current allocation fields per pillar for GMV, Views, Contents, Creators, FYP, Budget, etc.",
+      "User edits or confirms allocation values such that Total Allocation ≤ Master Target for every metric (Remaining Target ≥ 0).",
+      "User confirms that the Save button is enabled.",
+      "User clicks \"Save\"."
+    ],
+    "expected_result": [
+      "The system validates that all allocation values are numeric and no metric is over-allocated (Remaining Target ≥ 0).",
+      "Allocation values are saved for the current Master Campaign.",
+      "The \"Add/Edit Allocation\" pop-up closes automatically.",
+      "The Pillar Contribution table is updated to reflect the new per-pillar targets (Allocation) and recalculated remaining targets/achievement where applicable.",
+      "The Dashboard Overview target metrics that depend on allocation are updated accordingly (if applicable by design).",
+      "The Updated Date / Update Information for the Master Campaign is refreshed both on the Detail Dashboard and in the Master Campaign List."
+    ],
+    "dependencies": [
+      {
+        "stable_id": "R6-B7.2-TC01",
+        "reason": "This case needs an existing Master Campaign record; R6-B7.2-TC01 can create one during automated setup."
+      }
+    ],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/67e8e371-f3ec-4e9b-b306-ca5c50f5b18d",
+      "historical_note": "https://applink.larksuite.com/client/todo/detail?guid=9a9cccc7-f882-4d02-b752-079175a6fcc5&suite_entity_num=t100232"
+    }
+  },
+  {
+    "stable_id": "R6-B7.4-TC04",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 42,
+    "scenario_group": "B7.4 Allocate Master Campaign Target",
+    "case_no": 4,
+    "scenario": "Add/Edit Allocation",
+    "title": "Real-Time Recalculation of Total & Remaining",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Add/Edit Allocation: Real-Time Recalculation of Total & Remaining.",
+    "precondition": "The \"Add/Edit Allocation\" pop-up is open. Existing allocation values (including possibly 0) are displayed for each pillar and each metric.",
+    "steps": [
+      "With the \"Add/Edit Allocation\" pop-up open, user focuses on any allocation field for a metric (e.g., GMV Allocation for a specific pillar).",
+      "User changes the value in that field (e.g., from 1,000,000 to 2,000,000).",
+      "User moves focus to another field or pauses typing."
+    ],
+    "expected_result": [
+      "For the edited metric, the Total Allocation row is recalculated in real time to reflect the new sum across all pillars.",
+      "For the same metric, the Remaining Target row is recalculated as Master Target – new Total Allocation and updated immediately.",
+      "No manual refresh or page reload is required; recalculation happens dynamically as values change."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed"
+    }
+  },
+  {
+    "stable_id": "R6-B7.4-TC05",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 43,
+    "scenario_group": "B7.4 Allocate Master Campaign Target",
+    "case_no": 5,
+    "scenario": "Add/Edit Allocation",
+    "title": "Remaining Target Highlighting (Valid State)",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Add/Edit Allocation: Remaining Target Highlighting (Valid State).",
+    "precondition": "The \"Add/Edit Allocation\" pop-up is open. User enters allocation values such that for all metrics, Remaining Target ≥ 0.",
+    "steps": [
+      "User enters or adjusts allocation values for one or more metrics (e.g., GMV, Views, Budget) across pillars.",
+      "The system recalculates the Remaining Target row for each metric based on current allocations."
+    ],
+    "expected_result": [
+      "For any metric where Remaining Target > 0, the Remaining Target cell is highlighted in green (indicating still under target).",
+      "For any metric where Remaining Target = 0, the Remaining Target cell is shown in gray (indicating exactly on target).",
+      "No metric shows a negative Remaining Target.",
+      "The Save button remains enabled, allowing the user to save the current allocation state."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed"
+    }
+  },
+  {
+    "stable_id": "R6-B7.4-TC06",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 44,
+    "scenario_group": "B7.4 Allocate Master Campaign Target",
+    "case_no": 6,
+    "scenario": "Add/Edit Allocation",
+    "title": "Over-Allocation – Save Disabled",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Negative",
+    "intent": "Verify Add/Edit Allocation: Over-Allocation – Save Disabled.",
+    "precondition": "The \"Add/Edit Allocation\" pop-up is open. User is editing allocation values. At least one metric becomes over-allocated (Total Allocation > Master Target).",
+    "steps": [
+      "User updates allocation values for one or more pillars so that for at least one metric, the sum of all allocations exceeds the Master Target.",
+      "The system recalculates the Total Allocation and Remaining Target rows."
+    ],
+    "expected_result": [
+      "For any metric where Total Allocation > Master Target, the corresponding Remaining Target value becomes negative.",
+      "The Remaining Target cell for that metric is highlighted in red to indicate over-allocation.",
+      "The Save button becomes disabled, preventing the user from saving while over-allocation exists.",
+      "Allocation changes are not saved until the user adjusts values so that Remaining Target ≥ 0 for all metrics and the Save button becomes enabled again."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed"
+    }
+  },
+  {
+    "stable_id": "R6-B7.4-TC07",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 45,
+    "scenario_group": "B7.4 Allocate Master Campaign Target",
+    "case_no": 7,
+    "scenario": "Add/Edit Allocation",
+    "title": "Numeric-Only Allocation Fields",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Negative",
+    "intent": "Verify Add/Edit Allocation: Numeric-Only Allocation Fields.",
+    "precondition": "The \"Add/Edit Allocation\" pop-up is open. Allocation fields for each metric (GMV, Views, Contents, Creators, FYP, Budget, etc.) are implemented as numeric-only inputs.",
+    "steps": [
+      "User focuses on any numeric allocation field, such as GMV Allocation, Views Allocation, Budget Allocation, Creators Allocation, FYP Allocation, or Contents Allocation.",
+      "User attempts to type non-numeric characters in the field (e.g., letters like \"abc\", special symbols like \"@#$\"), excluding valid numeric formatting like \",\" or \".\" if supported by design.",
+      "User observes the field while typing."
+    ],
+    "expected_result": [
+      "The input field ignores non-numeric characters: letters and unsupported symbols do not appear in the field.",
+      "Only digits (and allowed numeric separators like comma/decimal point, if supported) are accepted and visible.",
+      "As a result, only valid numeric values are stored and used in allocation calculations (Total Allocation, Remaining Target, highlighting, and Save state).",
+      "No error message is necessary for invalid characters because they never enter the field."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed"
+    }
+  },
+  {
+    "stable_id": "R6-B7.4-TC08",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 46,
+    "scenario_group": "B7.4 Allocate Master Campaign Target",
+    "case_no": 8,
+    "scenario": "Add/Edit Allocation",
+    "title": "Cancel – Discard Changes",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Negative",
+    "intent": "Verify Add/Edit Allocation: Cancel – Discard Changes.",
+    "precondition": "The \"Add/Edit Allocation\" pop-up is open. The Master Campaign Manager has changed one or more allocation values but has not yet saved.",
+    "steps": [
+      "With the \"Add/Edit Allocation\" pop-up open, user modifies one or more allocation fields for any metric and pillar (e.g., changes GMV Allocation, Views Allocation).",
+      "Instead of clicking Save, user clicks the \"Cancel\" button on the pop-up."
+    ],
+    "expected_result": [
+      "The \"Add/Edit Allocation\" pop-up closes immediately.",
+      "No allocation changes made during this session are saved or applied.",
+      "When the user returns to the Pillar Contribution section, all allocation values remain as they were before opening the pop-up (previous saved state).",
+      "The Dashboard Overview and Pillar Contribution metrics remain unchanged.",
+      "The Updated Date / Update Information in the Master Campaign Detail and Master Campaign List does not change, since no save operation occurred."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/48d1d168-c2f8-4d6e-bb1b-48f7142d4717"
+    }
+  },
+  {
+    "stable_id": "R6-B7.5-TC01",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 48,
+    "scenario_group": "B7.5 Master Campaign Detail Dashboard",
+    "case_no": 1,
+    "scenario": "Master Campaign Detail Dashboard",
+    "title": "Open Master Campaign Detail Dashboard",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Master Campaign Detail Dashboard: Open Master Campaign Detail Dashboard.",
+    "precondition": "A Master Campaign already exists (e.g., \"Summer Beauty Campaign 2024\") with basic info, targets, pillar mappings, and at least one related campaign. User has access rights to view it from the Master Campaign List.",
+    "steps": [
+      "User navigates to the Master Campaign List Page.",
+      "User locates a specific Master Campaign row (e.g., \"Summer Beauty Campaign 2024\").",
+      "User clicks on the Master Campaign Name or a dedicated \"View Detail\" action.",
+      "The system loads the Master Campaign Detail Dashboard page for that Master Campaign."
+    ],
+    "expected_result": [
+      "The header displays correct information for the selected Master Campaign: Name, Brand, Period, Status, and Updated Date.",
+      "The Dashboard Overview section shows KPI cards for all configured metrics (e.g., GMV, Views, Contents, Creators, FYP, Budget Usage, CPV, Avg ER%), each with Target, Actual, and % Achievement as applicable.",
+      "The Pillar Contribution section displays trend/table data for all pillars associated with this Master Campaign.",
+      "The Campaign List table lists all campaigns linked to this Master Campaign (subject to default filters), each with correct performance and budget data."
+    ],
+    "dependencies": [
+      {
+        "stable_id": "R6-B7.2-TC01",
+        "reason": "This case needs an existing Master Campaign record; R6-B7.2-TC01 can create one during automated setup."
+      }
+    ],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/2e6c3993-94c3-464b-ad78-8b7edd205647",
+      "historical_note": "https://applink.larksuite.com/client/todo/detail?guid=f5aedfe1-9da4-41a3-90aa-fd7518a35ef0&suite_entity_num=t100073"
+    }
+  },
+  {
+    "stable_id": "R6-B7.5-TC02",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 49,
+    "scenario_group": "B7.5 Master Campaign Detail Dashboard",
+    "case_no": 2,
+    "scenario": "Master Campaign Detail Dashboard",
+    "title": "Apply Time & Pillar Filters",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Master Campaign Detail Dashboard: Apply Time & Pillar Filters.",
+    "precondition": "The Master Campaign Detail Dashboard is open for a specific Master Campaign. Default filters are applied: Time = All, all pillars selected. Pillars and campaign data exist for multiple time ranges and pillars.",
+    "steps": [
+      "User ensures they are on the Master Campaign Detail Dashboard for a given Master Campaign.",
+      "User opens or uses the Time filter (e.g., dropdown/selector) and selects a non-default option (e.g., L30D or a specific date range).",
+      "User opens or uses the Pillar filter and selects a subset of pillars (e.g., only \"Awareness\" and \"Conversion\").",
+      "User confirms/ applies the filters (if explicit Apply action is required by design)."
+    ],
+    "expected_result": [
+      "The Dashboard Overview KPI cards refresh to show Actual and % Achievement values calculated only from data matching the selected Time range and selected pillars.",
+      "The Pillar Contribution section (trend and table) refreshes to display only those pillars selected in the filter and reflects recalculated values for Target-related and Actual metrics (where relevant).",
+      "The Campaign List table refreshes to list only campaigns under that Master Campaign whose data falls within the selected Time range and selected pillars.",
+      "No data outside the chosen Time and Pillar filters is shown in any of these sections."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/aa3e6c1c-108a-4764-8487-3021e32b3a61"
+    }
+  },
+  {
+    "stable_id": "R6-B7.5-TC03",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 50,
+    "scenario_group": "B7.5 Master Campaign Detail Dashboard",
+    "case_no": 3,
+    "scenario": "Master Campaign Detail Dashboard",
+    "title": "Open Campaign Detail from Campaign List",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Master Campaign Detail Dashboard: Open Campaign Detail from Campaign List.",
+    "precondition": "The Master Campaign Detail Dashboard is open, and the Campaign List section is visible with at least one campaign row. User has permission to view campaign details.",
+    "steps": [
+      "User scrolls to or views the Campaign List section at the bottom of the Master Campaign Detail Dashboard.",
+      "User identifies a campaign row in the table.",
+      "User clicks on either the Campaign Name (if clickable) or the \"View Detail\" action/button in that row."
+    ],
+    "expected_result": [
+      "The system navigates to the Campaign Detail view corresponding to the selected campaign (page, drawer, or modal according to product pattern).",
+      "The context that this campaign belongs to a particular Master Campaign is preserved logically (e.g., breadcrumbs, back navigation returns to the same Master Campaign Detail Dashboard).",
+      "No error is shown, and the user can see full details for the selected campaign."
+    ],
+    "dependencies": [
+      {
+        "stable_id": "R6-B7.2-TC01",
+        "reason": "This case needs an existing Master Campaign record; R6-B7.2-TC01 can create one during automated setup."
+      }
+    ],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/348cecf9-350c-4a5e-a18e-d5c1fa96e005"
+    }
+  },
+  {
+    "stable_id": "R6-B7.5-TC04",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 51,
+    "scenario_group": "B7.5 Master Campaign Detail Dashboard",
+    "case_no": 4,
+    "scenario": "Master Campaign Detail Dashboard",
+    "title": "Dashboard After Target/Allocation Update",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Master Campaign Detail Dashboard: Dashboard After Target/Allocation Update.",
+    "precondition": "A Master Campaign has had its targets or allocations updated (via Edit Master Campaign or Add/Edit Allocation) and the changes were saved successfully.",
+    "steps": [
+      "User completes an update to the Master Campaign (e.g., changes targets in Edit Master Campaign or adjusts allocations in Add/Edit Allocation) and clicks Update/Save successfully.",
+      "User navigates to or refreshes the Master Campaign Detail Dashboard for that Master Campaign."
+    ],
+    "expected_result": [
+      "The Dashboard Overview section displays updated Target values matching the latest configuration/allocation, and recalculated % Achievement based on the new targets and existing Actuals.",
+      "The Pillar Contribution table reflects the updated per-pillar targets (Allocation) for all metrics, and recalculated Remaining/achievement values where implemented.",
+      "Any related visualizations (e.g., trend graphs) are recalculated based on the new target/allocation context.",
+      "The Updated Date / Update Information field in the header and/or dashboard sections shows the latest timestamp corresponding to the most recent update."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/49c80610-2401-4350-8e7a-df9f1f941238"
+    }
+  },
+  {
+    "stable_id": "R6-B7.5-TC05",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 52,
+    "scenario_group": "B7.5 Master Campaign Detail Dashboard",
+    "case_no": 5,
+    "scenario": "Master Campaign Detail Dashboard",
+    "title": "Time & Pillar Filter Returns No Data",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Negative",
+    "intent": "Verify Master Campaign Detail Dashboard: Time & Pillar Filter Returns No Data.",
+    "precondition": "The Master Campaign Detail Dashboard is open. For some combinations of Time and Pillar filters, there is no matching data (e.g., no campaigns or metrics in that period for selected pillars).",
+    "steps": [
+      "User ensures they are on the Master Campaign Detail Dashboard.",
+      "User sets the Time filter to a range where the Master Campaign has no data (e.g., a future date range or period before campaign start).",
+      "User selects a pillar or pillars that also have no recorded data in that time window (if applicable).",
+      "User applies the filters."
+    ],
+    "expected_result": [
+      "The Dashboard Overview KPI cards show zero/empty Actual values (or -) according to design, clearly indicating no data for that filter combination.",
+      "The Pillar Contribution section (trend/table) appears empty or shows 0 values and/or a clear \"No data\" message, with no old values from previous filters displayed.",
+      "The Campaign List table shows no campaign rows and displays an empty state message such as \"No data found for the selected filters.\"",
+      "No prior data (from earlier filter states) remains visible or misleading; everything reflects the current filter state."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/ff284e3b-9072-436f-9f7b-36060f7004e4"
+    }
+  },
+  {
+    "stable_id": "R6-B7.5-TC06",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 53,
+    "scenario_group": "B7.5 Master Campaign Detail Dashboard",
+    "case_no": 6,
+    "scenario": "Master Campaign Detail Dashboard",
+    "title": "Division by Zero for CPV/ROI",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Negative",
+    "intent": "Verify Master Campaign Detail Dashboard: Division by Zero for CPV/ROI.",
+    "precondition": "The Master Campaign Detail Dashboard is open. The Campaign List contains at least one campaign where Total Views = 0 and/or Used Budget = 0.",
+    "steps": [
+      "User navigates to the Campaign List section of the Master Campaign Detail Dashboard.",
+      "User reviews the campaign rows that have Total Views = 0 and/or Used Budget =",
+      "System attempts to calculate CPV (Used Budget / Total Views) and ROI (Total GMV / Used Budget) for each row."
+    ],
+    "expected_result": [
+      "For campaigns where Total Views = 0, the CPV column displays N/A or - instead of Infinity, NaN, or a system error.",
+      "For campaigns where Used Budget = 0, the ROI column displays N/A or - instead of Infinity, NaN, or a system error.",
+      "All other campaigns with valid non-zero denominators show correctly calculated CPV and ROI values.",
+      "The UI remains stable, with no crashes or broken layouts caused by division by zero."
+    ],
+    "dependencies": [
+      {
+        "stable_id": "R6-B7.2-TC01",
+        "reason": "This case needs an existing Master Campaign record; R6-B7.2-TC01 can create one during automated setup."
+      }
+    ],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed"
+    }
+  },
+  {
+    "stable_id": "R6-B7.5-TC07",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 54,
+    "scenario_group": "B7.5 Master Campaign Detail Dashboard",
+    "case_no": 7,
+    "scenario": "Master Campaign Detail Dashboard",
+    "title": "Data Load Error",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Negative",
+    "intent": "Verify Master Campaign Detail Dashboard: Data Load Error.",
+    "precondition": "The Master Campaign Manager navigates to the Master Campaign Detail Dashboard. Due to a backend or network issue, one or more data sources (e.g., overview metrics, pillar data, or campaign list) fail to load.",
+    "steps": [
+      "User navigates from the Master Campaign List Page (or another module) to the Master Campaign Detail Dashboard for a specific Master Campaign.",
+      "A backend error, timeout, or network failure occurs when the system requests data for Dashboard Overview, Pillar Contribution, and/or Campaign List.",
+      "The dashboard attempts to render the page."
+    ],
+    "expected_result": [
+      "Sections affected by the failed data load (e.g., Dashboard Overview cards, Pillar Contribution, Campaign List) show a clear error or empty state message (e.g., \"Unable to load data, please try again\" or similar), instead of rendering stale or partial data as if it were correct.",
+      "No outdated or incorrect values are shown as \"current\" in those sections.",
+      "The overall page remains accessible (no crash), and the user may have an option to retry/refresh according to design.",
+      "Other unaffected sections (if any) can still display valid data, but nothing misleading is shown."
+    ],
+    "dependencies": [],
+    "automation_status": "manual_review",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed"
+    }
+  },
+  {
+    "stable_id": "R6-B7.5-TC08",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 55,
+    "scenario_group": "B7.5 Master Campaign Detail Dashboard",
+    "case_no": 8,
+    "scenario": "Master Campaign Detail Dashboard",
+    "title": "FYP Views Range Breakdown",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Master Campaign Detail Dashboard: FYP Views Range Breakdown.",
+    "precondition": "1. The Master Campaign Detail Dashboard is open.",
+    "steps": [
+      "The Master Campaign Detail Dashboard is open."
+    ],
+    "expected_result": [
+      "The system displays the actual number of contents marked as FYP.",
+      "FYP is calculated as:",
+      "FYP = COUNT(content_link)",
+      "WHERE:",
+      "content.views ≥ 150% × median views of the Content Source account",
+      "AND:",
+      "content.views ≥ 10,000",
+      "The FYP calculation is based on the median views of the Content Source account, not the username account."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/af3379a1-58a5-41b0-9a95-f46720e2d2aa",
+      "historical_note": "https://applink.larksuite.com/client/todo/detail?guid=69429617-3828-41cf-ba9b-0f5920f26a06&suite_entity_num=t100074"
+    }
+  },
+  {
+    "stable_id": "R6-B7.5-TC09",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 56,
+    "scenario_group": "B7.5 Master Campaign Detail Dashboard",
+    "case_no": 9,
+    "scenario": "Master Campaign Detail Dashboard",
+    "title": "Productivity Calculation",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Master Campaign Detail Dashboard: Productivity Calculation.",
+    "precondition": "1. The Master Campaign Detail Dashboard is open.",
+    "steps": [
+      "The Master Campaign Detail Dashboard is open."
+    ],
+    "expected_result": [
+      "The system displays the Productivity value, representing the output per content.",
+      "The system calculates the Productivity value using the following formula:",
+      "Productivity = GMV / number of videos with Yellow Cart"
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/18fdfd7b-304e-471e-a26e-e619806d5be0"
+    }
+  },
+  {
+    "stable_id": "R6-B7.5-TC10",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 57,
+    "scenario_group": "B7.5 Master Campaign Detail Dashboard",
+    "case_no": 10,
+    "scenario": "Top 10 Content",
+    "title": "Top 10 Content refresh after Time/Pillar filter change",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Top 10 Content: Top 10 Content refresh after Time/Pillar filter change.",
+    "precondition": "The Master Campaign Detail Dashboard is open and the Top 10 Content section is visible with at least some content shown.",
+    "steps": [
+      "User changes the Time filter (e.g., from All to L30D) and/or the Pillar filter.",
+      "User waits for the Top 10 Content section to reload."
+    ],
+    "expected_result": [
+      "The Top 10 Content list is recalculated using the active Time and Pillar filters.",
+      "Up to 10 contents are displayed, ordered according to the defined ranking logic (e.g., GMV, then Views).",
+      "Any content that no longer matches the filters is no longer shown."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/eba9bdd3-b8ab-49c4-83a0-d9d660420d14"
+    }
+  },
+  {
+    "stable_id": "R6-B7.5-TC11",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 58,
+    "scenario_group": "B7.5 Master Campaign Detail Dashboard",
+    "case_no": 11,
+    "scenario": "Top 10 Content",
+    "title": "Filter Top 10 Content by Content Type",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Top 10 Content: Filter Top 10 Content by Content Type.",
+    "precondition": "The Master Campaign Detail Dashboard is open and the Top 10 Content section shows multiple content types (TikTok Video, Shopee Video, IG Reels, etc.).",
+    "steps": [
+      "User opens the Content Type filter in the Top 10 Content section.",
+      "User selects one or more Content Types (e.g., TikTok Video, IG Reels).",
+      "User applies the filter (if required by UI)."
+    ],
+    "expected_result": [
+      "The Top 10 Content list refreshes to show only contents matching the selected Content Types.",
+      "The list still displays up to 10 items, ordered according to the defined ranking logic."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_note": "https://applink.larksuite.com/client/todo/detail?guid=ae0ddae4-e7cb-4930-8b22-5e8af46d632a&suite_entity_num=t100050"
+    }
+  },
+  {
+    "stable_id": "R6-B7.5-TC12",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 59,
+    "scenario_group": "B7.5 Master Campaign Detail Dashboard",
+    "case_no": 12,
+    "scenario": "Top 10 Content",
+    "title": "Open content from Top 10 card",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Top 10 Content: Open content from Top 10 card.",
+    "precondition": "The Master Campaign Detail Dashboard is open and Top 10 Content cards are visible with clickable thumbnail and/or URL link.",
+    "steps": [
+      "User identifies a content card in the Top 10 Content section.",
+      "User clicks on the content thumbnail or URL link."
+    ],
+    "expected_result": [
+      "A new browser tab/window opens.",
+      "The opened page points to the original content on its platform (e.g., TikTok, Shopee, Instagram, YouTube)."
+    ],
+    "dependencies": [],
+    "automation_status": "manual_review",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_note": "https://applink.larksuite.com/client/todo/detail?guid=e9fdb732-2f13-458a-b0f8-2539a85f49a7&suite_entity_num=t100049"
+    }
+  },
+  {
+    "stable_id": "R6-B7.5-TC13",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 60,
+    "scenario_group": "B7.5 Master Campaign Detail Dashboard",
+    "case_no": 13,
+    "scenario": "Content by Type",
+    "title": "Content by Type after filter change",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Content by Type: Content by Type after filter change.",
+    "precondition": "The Master Campaign Detail Dashboard is open and the Content by Type table is visible with populated rows.",
+    "steps": [
+      "User changes the Time filter and/or the Pillar filter on the Master Campaign Detail Dashboard.",
+      "User waits for the Content by Type table to reload."
+    ],
+    "expected_result": [
+      "The Content by Type table refreshes to show one row per Content Type matching the active filters.",
+      "Aggregated metrics (Total Content, Total Creators, Total Views, FYP ranges, Total Engagement, ER%, CPV, GMV, Productivity, Orders, reactions) are recalculated using only contents that satisfy the current Time and Pillar filters."
+    ],
+    "dependencies": [
+      {
+        "stable_id": "R6-B7.2-TC01",
+        "reason": "This case needs an existing Master Campaign record; R6-B7.2-TC01 can create one during automated setup."
+      }
+    ],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/be2dccd9-2a15-46a8-b7bf-b505a1ac513f"
+    }
+  },
+  {
+    "stable_id": "R6-B7.5-TC14",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 61,
+    "scenario_group": "B7.5 Master Campaign Detail Dashboard",
+    "case_no": 14,
+    "scenario": "Content by Type",
+    "title": "Verify aggregation consistency by Content Type",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Content by Type: Verify aggregation consistency by Content Type.",
+    "precondition": "The Master Campaign Detail Dashboard is open; at least one Content Type (e.g., TikTok Video) has multiple underlying contents that match the current filters.",
+    "steps": [
+      "User notes the Content Type row (e.g., TikTok Video) in the Content by Type table.",
+      "User cross-checks underlying content data (via detail view or export, depending on tools).",
+      "User sums key metrics (Total Content, Total Views, Total GMV, Total Engagement) for that content type."
+    ],
+    "expected_result": [
+      "For the selected Content Type, the row's Total Content, Total Views, Total GMV, and Total Engagement equal the sum of the same metrics from all underlying contents of that type under the active Time and Pillar filters."
+    ],
+    "dependencies": [
+      {
+        "stable_id": "R6-B7.2-TC01",
+        "reason": "This case needs an existing Master Campaign record; R6-B7.2-TC01 can create one during automated setup."
+      }
+    ],
+    "automation_status": "manual_review",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed"
+    }
+  },
+  {
+    "stable_id": "R6-B7.5-TC15",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 62,
+    "scenario_group": "B7.5 Master Campaign Detail Dashboard",
+    "case_no": 15,
+    "scenario": "Content by Type",
+    "title": "Last Update Time displayed",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Positive",
+    "intent": "Verify Content by Type: Last Update Time displayed.",
+    "precondition": "The Master Campaign Detail Dashboard is open and Content by Type section supports a Last Update Time field.",
+    "steps": [
+      "User loads or refreshes the Master Campaign Detail Dashboard.",
+      "User scrolls to the Content by Type section."
+    ],
+    "expected_result": [
+      "The Content by Type section displays Last Update Time in DD MM YYYY TIMESTAMP format.",
+      "The timestamp reflects the latest data refresh for the table according to system rules (not an outdated or null value)."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed"
+    }
+  },
+  {
+    "stable_id": "R6-B7.5-TC16",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 63,
+    "scenario_group": "B7.5 Master Campaign Detail Dashboard",
+    "case_no": 16,
+    "scenario": "Top 10 Content",
+    "title": "Top 10 Content – Filter returns no data",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Negative",
+    "intent": "Verify Top 10 Content: Top 10 Content – Filter returns no data.",
+    "precondition": "The Master Campaign Detail Dashboard is open; Top 10 Content section is visible.",
+    "steps": [
+      "User applies a combination of Time, Pillar, and/or Content Type filters that results in no matching content.",
+      "User waits for the Top 10 Content section to reload."
+    ],
+    "expected_result": [
+      "The Top 10 Content section shows a clear \"No data\" or equivalent empty-state message.",
+      "No content cards are displayed.",
+      "Any content previously shown under different filters is not displayed (no stale data)."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/eba9bdd3-b8ab-49c4-83a0-d9d660420d14"
+    }
+  },
+  {
+    "stable_id": "R6-B7.5-TC17",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 64,
+    "scenario_group": "B7.5 Master Campaign Detail Dashboard",
+    "case_no": 17,
+    "scenario": "Top 10 Content",
+    "title": "Fewer than 10 contents available",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Negative (edge case)",
+    "intent": "Verify Top 10 Content: Fewer than 10 contents available.",
+    "precondition": "The Master Campaign Detail Dashboard is open; only 3 contents match the current Time, Pillar, and Content Type filters.",
+    "steps": [
+      "User applies the desired Time, Pillar, and Content Type filters.",
+      "User scrolls to the Top 10 Content section."
+    ],
+    "expected_result": [
+      "The Top 10 Content section displays only the 3 matching content cards.",
+      "Cards are ordered according to the defined ranking metric.",
+      "The section does not pad, duplicate, or fabricate additional items to reach 10 entries."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed"
+    }
+  },
+  {
+    "stable_id": "R6-B7.5-TC18",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 65,
+    "scenario_group": "B7.5 Master Campaign Detail Dashboard",
+    "case_no": 18,
+    "scenario": "Content by Type",
+    "title": "Content by Type – Filter returns no data",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Negative",
+    "intent": "Verify Content by Type: Content by Type – Filter returns no data.",
+    "precondition": "The Master Campaign Detail Dashboard is open; Content by Type table is visible.",
+    "steps": [
+      "User applies a combination of Time and Pillar filters such that no content exists under those filters.",
+      "User waits for the Content by Type table to reload."
+    ],
+    "expected_result": [
+      "The Content by Type table shows an empty-state UI with a clear \"No data\" message.",
+      "No rows or totals from previous filter states remain visible.",
+      "No misleading or stale aggregated metrics are displayed."
+    ],
+    "dependencies": [],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed",
+      "historical_evidence": "https://jam.dev/c/be2dccd9-2a15-46a8-b7bf-b505a1ac513f"
+    }
+  },
+  {
+    "stable_id": "R6-B7.5-TC19",
+    "release": "R6",
+    "sheet": "Sheet1",
+    "source_row": 66,
+    "scenario_group": "B7.5 Master Campaign Detail Dashboard",
+    "case_no": 19,
+    "scenario": "Content by Type",
+    "title": "Division by zero for ER% or CPV",
+    "site": "admin",
+    "module": "Master Campaign",
+    "type": "Negative (validation / edge case)",
+    "intent": "Verify Content by Type: Division by zero for ER% or CPV.",
+    "precondition": "The Master Campaign Detail Dashboard is open; at least one Content Type has Total Views = 0 under the current filters.",
+    "steps": [
+      "System recalculates Content by Type metrics based on active Time and Pillar filters.",
+      "User observes ER (%) and CPV columns for any Content Type where Total Views ="
+    ],
+    "expected_result": [
+      "For Content Types with Total Views = 0, ER (%) and CPV cells display N/A or – instead of Infinity, NaN, or an error.",
+      "All other metrics in the row (e.g., Total Content, Total Engagement, GMV) remain correctly calculated and displayed."
+    ],
+    "dependencies": [
+      {
+        "stable_id": "R6-B7.2-TC01",
+        "reason": "This case needs an existing Master Campaign record; R6-B7.2-TC01 can create one during automated setup."
+      }
+    ],
+    "automation_status": "needs_mapping",
+    "source": {
+      "workbook": "input-packages/R6-sample/R6.xlsx",
+      "historical_status": "Passed"
     }
   }
 ]

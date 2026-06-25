@@ -8,6 +8,8 @@ export type QaStatus =
   | "ENV_BLOCKED"
   | "MANUAL_REVIEW";
 
+export type AutomationStatus = "ready" | "needs_mapping" | "manual_review";
+
 export interface CaseDependency {
   stable_id: string;
   reason: string;
@@ -17,6 +19,7 @@ export interface CaseSource {
   workbook: string;
   historical_status?: string;
   historical_evidence?: string;
+  historical_note?: string;
 }
 
 export interface NormalizedCase {
@@ -36,6 +39,7 @@ export interface NormalizedCase {
   steps: string[];
   expected_result: string[];
   dependencies: CaseDependency[];
+  automation_status: AutomationStatus;
   source: CaseSource;
 }
 

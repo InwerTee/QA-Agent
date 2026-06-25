@@ -1,22 +1,33 @@
 {
   "release": "R6",
   "title": "Master Campaign",
+  "generated_at": "2026-06-25T05:52:13.142Z",
+  "input_package": "input-packages/R6-sample",
   "prd": {
-    "path": "../参考文档/现有PRD/PRD - R6 Master Campaign.pdf",
+    "path": "input-packages/R6-sample/PRD - R6 Master Campaign.pdf",
     "role": "business_context"
   },
   "test_case_source": {
-    "workbook": "../参考文档/Internal Testing for UAT Gro.xlsx",
-    "sheet": "R6 - Master Campaign",
+    "workbook": "input-packages/R6-sample/R6.xlsx",
+    "sheet": "Sheet1",
     "header_row": 8
   },
-  "pilot_case_ids": [
-    "R6-B7.2-TC01",
-    "R6-B7.1-TC01"
+  "totals": {
+    "cases": 53,
+    "scenario_groups": 5,
+    "automation": {
+      "ready": 2,
+      "needs_mapping": 48,
+      "manual_review": 3
+    }
+  },
+  "ready_case_ids": [
+    "R6-B7.1-TC01",
+    "R6-B7.2-TC01"
   ],
   "notes": [
-    "Do not modify the original PRD or workbook.",
-    "Excel source rows are trace-only metadata, not stable case identifiers.",
-    "Historical Status/Evidence columns in the workbook are not reused as the new run result."
+    "Generated from a local input package; do not modify the original PRD or workbook.",
+    "Excel row numbers are trace-only metadata, not stable identifiers.",
+    "Historical Status/Evidence columns are source context only and are not reused as the new run result."
   ]
 }

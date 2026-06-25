@@ -4,12 +4,12 @@
 
 最终使用方式应该很简单:同事把本次 release 的 PRD 和测试用例交给 agent,agent 读取、执行,然后输出结果报告。它不应该依赖本地 `参考文档/` 文件夹。
 
-第一版目标很小:先支持 R6 Master Campaign 的两条试点 case,跑出清楚的 actual vs expected、状态、失败原因和最小 evidence。它不是完整 QA 平台,也不回写 Excel,不接 Jam,不批量跑完整工作簿。
+第一版目标很小:先支持 R6 Master Campaign 的真实 test case workbook ingestion,并继续让两条试点 case 跑出清楚的 actual vs expected、状态、失败原因和最小 evidence。它不是完整 QA 平台,也不回写 Excel,不接 Jam,不批量跑完整工作簿。
 
-当前的 `inputs/R6/` 不是正式输入模式,而是我们为了验证 agent 逻辑手工挑出来的小型开发样例。它的作用是先证明:
+当前的 `inputs/R6/` 是从本地 R6 input package 生成出来的开发样例。它的作用是先证明:
 
 ```text
-一小组 test cases -> staging 执行 -> actual vs expected -> 结果报告
+PRD + test case Excel -> normalized cases -> staging 执行 -> actual vs expected -> 结果报告
 ```
 
 未来正式使用时,用户会提供 PRD 文档和测试用例文档,agent 再生成自己的 normalized cases 并执行。
@@ -18,7 +18,7 @@
 
 - Release: R6 - Master Campaign
 - PRD: 当前开发样例来自本地参考资料,未来由用户在每次运行时提供。
-- Test cases: 当前开发样例来自本地参考资料,未来由用户在每次运行时提供。
+- Test cases: 当前开发样例由 `input-packages/R6-sample/` 生成,未来由用户在每次运行时提供。
 - Pilot cases:
   - `R6-B7.2-TC01` - Create Master Campaign with All Fields
   - `R6-B7.1-TC01` - Search by Master Campaign Name (Success)
@@ -32,13 +32,15 @@ docs/
   workflow.md               # 正式输入/输出 workflow 说明
 
 inputs/R6/
-  manifest.json             # 当前 R6 开发样例的输入来源说明,不是正式用户输入
-  cases.normalized.json     # 当前 R6 开发样例的标准化 test cases,未来应由 parser 生成
+  manifest.json             # R6 input package 的输入来源说明
+  cases.normalized.json     # 从 R6 workbook 生成的标准化 test cases
+  ingestion_report.md       # 本次解析摘要和自动化状态分布
 
 src/
   cli.ts                    # 命令入口
   cases/                    # case 读取与过滤
   core/                     # setup plan 与判断类型
+  ingestion/                # PRD / Excel 输入包解析
   runner/                   # 执行调度
   reporting/                # JSON/Markdown 报告
   runtime/                  # env/runtime config
@@ -71,10 +73,13 @@ QA Agent/inputs/<release-or-run-id>/
 安装依赖后:
 
 ```bash
+npm run qa:prepare:r6
 npm run qa:list:r6
 npm run qa:plan:r6
 npm run qa:run:r6
 ```
+
+`qa:prepare:r6` 会从本地 `input-packages/R6-sample/` 读取 R6 PRD 和 Excel,生成 `inputs/R6/manifest.json`、`inputs/R6/cases.normalized.json` 和 `inputs/R6/ingestion_report.md`。`input-packages/` 是本地运行输入,不会进 git。
 
 如果 `.env` 还没有配置 staging URL 和账号,`run` 会生成 `ENV_BLOCKED` 报告,不会假装执行成功。
 
