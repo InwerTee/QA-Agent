@@ -44,7 +44,7 @@ export async function runInputPackage(
   });
   const cases = await loadCasesFromFile(prepared.casesPath);
   const triage = await triageRelease(prepared.release, cases, { outDir: prepared.outDir });
-  const selectedCases = selectCasesForPackageRun(cases, options.caseIds);
+  const selectedCases = selectCasesForPackageRun(cases, options.caseIds, triage.automationMap);
 
   if (selectedCases.length === 0) {
     throw new Error("No test cases were found for this input package.");
@@ -71,13 +71,14 @@ export async function runInputPackage(
 
 export function selectCasesForPackageRun(
   cases: NormalizedCase[],
-  requestedCaseIds: string[] = []
+  requestedCaseIds: string[] = [],
+  automationMap?: AutomationMap
 ): NormalizedCase[] {
   if (requestedCaseIds.length > 0) {
     return filterCases(cases, requestedCaseIds);
   }
 
-  return [...cases].sort((left, right) => left.source_row - right.source_row);
+  return sortCasesForExecution(cases, automationMap);
 }
 
 export function selectImplementedCases(
@@ -99,6 +100,50 @@ function compareRunnableCase(left: CaseTriage, right: CaseTriage): number {
   return (
     (left.main_flow_order ?? 999) - (right.main_flow_order ?? 999) ||
     left.traceability.source_row - right.traceability.source_row ||
+    left.stable_id.localeCompare(right.stable_id)
+  );
+}
+
+function sortCasesForExecution(
+  cases: NormalizedCase[],
+  automationMap?: AutomationMap
+): NormalizedCase[] {
+  const caseById = new Map(cases.map((testCase) => [testCase.stable_id, testCase]));
+  const triageById = new Map(
+    (automationMap?.cases ?? []).map((testCase) => [testCase.stable_id, testCase])
+  );
+  const remaining = new Set(cases.map((testCase) => testCase.stable_id));
+  const sorted: NormalizedCase[] = [];
+
+  while (remaining.size > 0) {
+    const ready = Array.from(remaining)
+      .map((id) => caseById.get(id)!)
+      .filter((testCase) =>
+        testCase.dependencies.every(
+          (dependency) => !remaining.has(dependency.stable_id) || !caseById.has(dependency.stable_id)
+        )
+      )
+      .sort((left, right) => compareExecutionCase(left, right, triageById));
+
+    const next = ready[0] ?? caseById.get(Array.from(remaining)[0])!;
+    sorted.push(next);
+    remaining.delete(next.stable_id);
+  }
+
+  return sorted;
+}
+
+function compareExecutionCase(
+  left: NormalizedCase,
+  right: NormalizedCase,
+  triageById: Map<string, CaseTriage>
+): number {
+  const leftTriage = triageById.get(left.stable_id);
+  const rightTriage = triageById.get(right.stable_id);
+
+  return (
+    (leftTriage?.main_flow_order ?? 999) - (rightTriage?.main_flow_order ?? 999) ||
+    left.source_row - right.source_row ||
     left.stable_id.localeCompare(right.stable_id)
   );
 }

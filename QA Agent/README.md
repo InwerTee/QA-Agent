@@ -4,7 +4,7 @@
 
 最终使用方式应该很简单:同事把本次 release 的 PRD 和测试用例交给 agent,agent 读取、执行,然后输出结果报告。它不应该依赖本地 `参考文档/` 文件夹。
 
-第一版目标很小:先支持 R6 Master Campaign 的真实 test case workbook ingestion,并继续让三条试点 case 跑出清楚的 actual vs expected、状态、失败原因和最小 evidence。它不是完整 QA 平台,不接 Jam,不批量跑完整工作簿;当前只会在 Paragon Excel 复制件里回填一列 `Agent Result`。
+第一版目标很小:先支持 R6 Master Campaign 的真实 test case workbook ingestion,并继续让三条试点 case 跑出清楚的 actual vs expected、状态、失败原因和最小 evidence。它不是完整 QA 平台,不接 Jam。当前会处理上传 workbook 中解析出的全部 case,但只有已经接入 executor 的 case 会实际执行 UI 自动化;其他 case 会以 blocked/review 方式进入报告和 Paragon Excel 复制件。
 
 当前的 `inputs/R6/` 是从本地 R6 input package 生成出来的开发样例。它的作用是先证明:
 
@@ -86,7 +86,7 @@ npm run qa -- run-package input-packages/R6-sample --release R6
 它会自动执行:
 
 ```text
-prepare -> triage -> run implemented cases -> export-results
+prepare -> triage -> process cases -> export-results
 ```
 
 最后输出:
@@ -128,7 +128,7 @@ http://127.0.0.1:4173
 
 不要直接双击或打开 `src/web/static/index.html`。这个页面需要本地 Node server 提供 `/api/run`,所以直接用 `file://` 打开会无法提交运行。
 
-页面支持上传 PRD PDF、Paragon test case `.xlsx`,可选填写一个本地 `Run label`,点击 Run 后等待结果。`Run label` 只是方便识别本次运行的名字,不会决定 case id 或 executor 匹配;agent 会从上传的测试用例内容和文件名推断 release。完成后可以下载 filled Excel / report,也可以打开结果文件夹。
+页面支持上传 PRD PDF、Paragon test case `.xlsx`,可选填写一个本地 `Run label`,点击 Run 后等待结果。`Run label` 只是方便识别本次运行的名字,不会决定 case id 或 executor 匹配;agent 会从上传的测试用例内容和文件名推断 release。完成后可以下载 filled Excel / report,也可以打开结果文件夹。网页默认会处理上传文件中解析出的全部 case;有 executor 的会执行,没有 executor 的也会写入报告和 Excel 结果列。
 
 `qa:prepare:r6` 会从本地 `input-packages/R6-sample/` 读取 R6 PRD 和 Excel,生成 `inputs/R6/manifest.json`、`inputs/R6/cases.normalized.json` 和 `inputs/R6/ingestion_report.md`。`input-packages/` 是本地运行输入,不会进 git。
 

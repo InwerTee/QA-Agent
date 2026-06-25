@@ -31,7 +31,7 @@ v0.4 把 R6 主流程从 `create -> search` 扩展到 `create -> search -> edit 
 
 v0.5 增加 `export-results`:它把某次 run 的工程化 `report.json` 转换回 Paragon 测试表视角。agent 不修改原 Excel,而是复制一份 workbook,在相关 sheet 原始内容最右侧后一列新增 `Agent Result`,并只填最终状态: `Passed`, `Partial`, `Failed`, `Blocked`, `Review`。actual result、failure reason、evidence、trace coverage 等详细信息保存在内部 `result_mapping.json`,不污染用户看的 Excel。
 
-v0.6 增加 `run-package`:这是本地 CLI MVP Runner。用户给一个 input package,agent 自动完成 `prepare -> triage -> run implemented cases -> export-results`,最后直接输出 filled Excel 路径。CLI 仍可用 `--release` 做开发期覆盖,但正常运行应优先从测试用例内容或文件名推断 release。它是后续本地 HTML Wrapper 的后端核心。
+v0.6 增加 `run-package`:这是本地 CLI MVP Runner。用户给一个 input package,agent 自动完成 `prepare -> triage -> process cases -> export-results`,最后直接输出 filled Excel 路径。默认会处理输入文件中解析出的全部 case;有 executor 的 case 执行 UI 自动化,没有 executor 的 case 也会生成明确 blocked/review 结果并回填 Excel。CLI 仍可用 `--release` 做开发期覆盖,但正常运行应优先从测试用例内容或文件名推断 release。它是后续本地 HTML Wrapper 的后端核心。
 
 v0.7 增加本地 HTML Wrapper:用户运行 `npm run qa:web`,浏览器打开 `http://127.0.0.1:4173`,上传 PRD PDF 和 Paragon `.xlsx`,可选输入 `Run label`,点击 Run,等待后下载 filled Excel 或打开结果文件夹。`Run label` 只是本地运行标签,不参与 release/case 匹配;release 应由 agent 从输入文件推断。它不做线上部署、多人并发、权限系统或复杂 run history;只是本地页面包住 v0.6 pipeline。
 

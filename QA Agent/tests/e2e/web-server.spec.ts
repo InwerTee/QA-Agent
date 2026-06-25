@@ -15,6 +15,7 @@ test("local web runner page exposes the minimal upload workflow", async () => {
   expect(html).toContain("Inferred release");
   expect(html).toContain("Download filled Excel");
   expect(html).toContain("Open result folder");
+  expect(html).toContain("Processed cases");
   expect(html).toContain("This page must be opened from the local QA Agent server");
   expect(html).toContain("Could not reach the local QA Agent server");
   expect(html).toContain("http://127.0.0.1:4173");
