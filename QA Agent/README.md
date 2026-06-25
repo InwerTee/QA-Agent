@@ -4,7 +4,7 @@
 
 最终使用方式应该很简单:同事把本次 release 的 PRD 和测试用例交给 agent,agent 读取、执行,然后输出结果报告。它不应该依赖本地 `参考文档/` 文件夹。
 
-第一版目标很小:先支持 R6 Master Campaign 的真实 test case workbook ingestion,并继续让三条试点 case 跑出清楚的 actual vs expected、状态、失败原因和最小 evidence。它不是完整 QA 平台,也不回写 Excel,不接 Jam,不批量跑完整工作簿。
+第一版目标很小:先支持 R6 Master Campaign 的真实 test case workbook ingestion,并继续让三条试点 case 跑出清楚的 actual vs expected、状态、失败原因和最小 evidence。它不是完整 QA 平台,不接 Jam,不批量跑完整工作簿;当前只会在 Paragon Excel 复制件里回填一列 `Agent Result`。
 
 当前的 `inputs/R6/` 是从本地 R6 input package 生成出来的开发样例。它的作用是先证明:
 
@@ -82,6 +82,7 @@ npm run qa:triage:r6
 npm run qa:list:r6
 npm run qa:plan:r6
 npm run qa:run:r6
+npm run qa -- export-results reports/runs/<run-id>/report.json
 ```
 
 `qa:prepare:r6` 会从本地 `input-packages/R6-sample/` 读取 R6 PRD 和 Excel,生成 `inputs/R6/manifest.json`、`inputs/R6/cases.normalized.json` 和 `inputs/R6/ingestion_report.md`。`input-packages/` 是本地运行输入,不会进 git。
@@ -92,6 +93,15 @@ npm run qa:run:r6
 - 哪些 case 是下一批可自动化候选。
 - 哪些 case 需要先准备 deterministic fixture / API setup / backend control。
 - 哪些 case 更适合人工复核或先明确 evidence 策略。
+
+`export-results` 会读取某次 run 的 `report.json`,复制 Paragon 原 Excel,并在每个相关 sheet 的原始内容最右侧后一列写入一列 `Agent Result`。它只填最终状态,不把 actual result、failure reason、evidence 或 trace notes 写进用户看的 Excel。详细映射会单独保存为 `result_mapping.json`。
+
+示例输出:
+
+```text
+reports/runs/<run-id>/R6.agent-filled.xlsx
+reports/runs/<run-id>/result_mapping.json
+```
 
 ## Traceability Guard
 
@@ -106,6 +116,28 @@ npm run qa:run:r6
 已经实现 executor 的 case 还必须有 traceability contract,声明每条原始 step / expected result 被哪个自动化动作或断言覆盖。当前 R6 三条已实现 case 都有 contract;其中 `R6-B7.2-TC01` 和 `R6-B7.3-TC01` 被明确标记为 smoke-level partial coverage,不会被误认为完整覆盖了原 case 的所有 expected result。
 
 如果 `.env` 还没有配置 staging URL 和账号,`run` 会生成 `ENV_BLOCKED` 报告,不会假装执行成功。
+
+## Excel 结果回填
+
+v0.5 的用户可见输出是 Paragon Excel 的复制件,不是工程化 debug 表。规则:
+
+- 原始 Paragon Excel 不修改。
+- 复制件保留原 sheet、原行、原格式。
+- 每个相关 sheet 只新增一列 `Agent Result`。
+- `Agent Result` 写在原始内容的最右侧后一列。
+- 只写最终状态: `Passed`, `Partial`, `Failed`, `Blocked`, `Review`。
+
+状态映射:
+
+```text
+PRODUCT_BUG -> Failed
+SETUP_BLOCKED / SCRIPT_BLOCKED / ENV_BLOCKED -> Blocked
+MANUAL_REVIEW -> Review
+PASS + full trace coverage -> Passed
+PASS + partial/not-covered trace coverage -> Partial
+```
+
+`result_mapping.json` 是 agent 内部账本,记录 stable id、source row、coverage summary、actual result、failure reason、evidence 和最终写入的 Excel cell。普通用户主要看 `*.agent-filled.xlsx`。
 
 ## 真实浏览器执行
 

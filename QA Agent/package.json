@@ -1,6 +1,6 @@
 {
   "name": "gro-qa-agent",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -18,7 +18,8 @@
   "dependencies": {
     "@playwright/test": "^1.45.0",
     "dotenv": "^16.4.5",
-    "read-excel-file": "^9.2.0"
+    "read-excel-file": "^9.2.0",
+    "xlsx-populate": "^1.21.0"
   },
   "devDependencies": {
     "@types/node": "^20.14.10",

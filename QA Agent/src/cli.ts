@@ -1,11 +1,12 @@
 import { loadCases, filterCases } from "./cases/loadCases.js";
 import { buildSetupPlan } from "./core/setupPlan.js";
+import { exportResultsToWorkbook } from "./export/exportResults.js";
 import { prepareInputPackage } from "./ingestion/prepareInputPackage.js";
 import { loadRuntimeConfig } from "./runtime/config.js";
 import { runCases } from "./runner/runCases.js";
 import { triageRelease } from "./triage/triageCases.js";
 
-type ParsedArgs = PrepareArgs | TriageArgs | CaseCommandArgs;
+type ParsedArgs = PrepareArgs | TriageArgs | ExportResultsArgs | CaseCommandArgs;
 
 interface PrepareArgs {
   command: "prepare";
@@ -18,6 +19,14 @@ interface TriageArgs {
   command: "triage";
   release: string;
   outDir?: string;
+}
+
+interface ExportResultsArgs {
+  command: "export-results";
+  reportPath: string;
+  sourceWorkbook?: string;
+  outPath?: string;
+  mappingPath?: string;
 }
 
 interface CaseCommandArgs {
@@ -39,6 +48,29 @@ async function main(): Promise<void> {
     console.log(`Manifest JSON: ${result.manifestPath}`);
     console.log(`Ingestion report: ${result.reportPath}`);
     console.log(JSON.stringify(result.automationSummary, null, 2));
+    return;
+  }
+
+  if (args.command === "export-results") {
+    const result = await exportResultsToWorkbook(args.reportPath, {
+      sourceWorkbook: args.sourceWorkbook,
+      outPath: args.outPath,
+      mappingPath: args.mappingPath
+    });
+    console.log(`Filled workbook: ${result.outputWorkbookPath}`);
+    console.log(`Result mapping: ${result.mappingPath}`);
+    console.log(
+      JSON.stringify(
+        {
+          run_id: result.mapping.run_id,
+          release: result.mapping.release,
+          filled_cases: result.mapping.cases.length,
+          result_column_by_sheet: result.mapping.result_column_by_sheet
+        },
+        null,
+        2
+      )
+    );
     return;
   }
 
@@ -86,9 +118,13 @@ function parseArgs(argv: string[]): ParsedArgs {
     return parsePrepareArgs(release, rest);
   }
 
+  if (command === "export-results") {
+    return parseExportResultsArgs(release, rest);
+  }
+
   if (!command || !release) {
     throw new Error(
-      "Usage: npm run qa -- <prepare|triage|list|plan|run> ..."
+      "Usage: npm run qa -- <prepare|triage|export-results|list|plan|run> ..."
     );
   }
 
@@ -172,6 +208,47 @@ function parsePrepareArgs(inputDir: string | undefined, rest: string[]): Prepare
   }
 
   return { command: "prepare", inputDir, release, outDir };
+}
+
+function parseExportResultsArgs(
+  reportPath: string | undefined,
+  rest: string[]
+): ExportResultsArgs {
+  if (!reportPath) {
+    throw new Error(
+      "Usage: npm run qa -- export-results <report-json> [--source-workbook <XLSX>] [--out <XLSX>] [--mapping-out <JSON>]"
+    );
+  }
+
+  let sourceWorkbook: string | undefined;
+  let outPath: string | undefined;
+  let mappingPath: string | undefined;
+
+  for (let index = 0; index < rest.length; index += 1) {
+    const token = rest[index];
+
+    if (token === "--source-workbook") {
+      sourceWorkbook = readNextArg(rest, index, "--source-workbook");
+      index += 1;
+      continue;
+    }
+
+    if (token === "--out") {
+      outPath = readNextArg(rest, index, "--out");
+      index += 1;
+      continue;
+    }
+
+    if (token === "--mapping-out") {
+      mappingPath = readNextArg(rest, index, "--mapping-out");
+      index += 1;
+      continue;
+    }
+
+    throw new Error(`Unknown argument: ${token}`);
+  }
+
+  return { command: "export-results", reportPath, sourceWorkbook, outPath, mappingPath };
 }
 
 function readNextArg(rest: string[], index: number, option: string): string {
