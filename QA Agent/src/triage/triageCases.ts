@@ -4,10 +4,12 @@ import type {
   AutomationMap,
   CaseTriage,
   NormalizedCase,
+  PrdKnowledgePack,
   TriageComplexity,
   TriagePriority,
   TriageReadiness
 } from "../types.js";
+import { findPrdContextForCase, summarizePrdKnowledge } from "../knowledge/prdKnowledge.js";
 import {
   getR6TraceContractCoverage,
   hasR6TraceContract
@@ -15,6 +17,7 @@ import {
 
 interface TriageOptions {
   outDir?: string;
+  prdKnowledge?: PrdKnowledgePack;
 }
 
 export interface TriageResult {
@@ -61,10 +64,11 @@ export async function triageRelease(
   const outDir = path.resolve(options.outDir ?? path.join("inputs", release));
   await mkdir(outDir, { recursive: true });
 
-  const triagedCases = cases.map(triageCase).sort(compareTriage);
+  const triagedCases = cases.map((testCase) => triageCase(testCase, options.prdKnowledge)).sort(compareTriage);
   const automationMap: AutomationMap = {
     release,
     generated_at: new Date().toISOString(),
+    prd_context: summarizePrdKnowledge(options.prdKnowledge),
     total_cases: triagedCases.length,
     summary: summarize(triagedCases),
     main_flow: triagedCases
@@ -89,17 +93,18 @@ export async function triageRelease(
   };
 }
 
-function triageCase(testCase: NormalizedCase): CaseTriage {
+function triageCase(testCase: NormalizedCase, prdKnowledge?: PrdKnowledgePack): CaseTriage {
   const text = caseText(testCase);
+  const prdContext = findPrdContextForCase(testCase, prdKnowledge);
   const executorKey = inferExecutorKey(testCase);
   const mainFlowOrder = MAIN_FLOW_ORDER[testCase.stable_id];
   const blockers = inferBlockers(testCase, text, executorKey);
   const readiness = inferReadiness(testCase, blockers);
   const priority = inferPriority(testCase, readiness, mainFlowOrder, text);
   const complexity = inferComplexity(testCase, text);
-  const capabilities = inferRequiredCapabilities(testCase, executorKey, text);
+  const capabilities = inferRequiredCapabilities(testCase, executorKey, text, prdContext);
   const dependsOn = inferDependsOnCaseIds(testCase, mainFlowOrder, text);
-  const rationale = inferRationale(testCase, readiness, priority, complexity, executorKey, blockers);
+  const rationale = inferRationale(testCase, readiness, priority, complexity, executorKey, blockers, prdContext);
 
   return {
     stable_id: testCase.stable_id,
@@ -250,12 +255,21 @@ function inferBlockers(testCase: NormalizedCase, text: string, executorKey: stri
 function inferRequiredCapabilities(
   testCase: NormalizedCase,
   executorKey: string,
-  text: string
+  text: string,
+  prdContext?: ReturnType<typeof findPrdContextForCase>
 ): string[] {
-  const capabilities = new Set<string>(["admin_session", "master_campaign_navigation"]);
+  const moduleKey = prdContext?.module?.key ?? normalizeKey(testCase.module);
+  const site = testCase.site;
+  const capabilities = new Set<string>([`${site}_session`, `${site}.${moduleKey}.discover`]);
 
   if (testCase.dependencies.length > 0 || /master campaign/i.test(text)) {
     capabilities.add("master_campaign_fixture");
+  }
+  for (const action of prdContext?.actions ?? []) {
+    capabilities.add(`${site}.${moduleKey}.${action.kind}`);
+  }
+  for (const page of prdContext?.pages ?? []) {
+    capabilities.add(`${site}.${page.module_key}.page:${normalizeKey(page.name)}`);
   }
   if (/search/i.test(executorKey)) capabilities.add("list_search");
   if (/filter/i.test(executorKey)) capabilities.add("list_filter");
@@ -305,7 +319,8 @@ function inferRationale(
   priority: TriagePriority,
   complexity: TriageComplexity,
   executorKey: string,
-  blockers: string[]
+  blockers: string[],
+  prdContext?: ReturnType<typeof findPrdContextForCase>
 ): string[] {
   const rationale = [
     `${priority} because this case ${MAIN_FLOW_ORDER[testCase.stable_id] ? "participates in the proposed R6 main flow" : "covers a supporting R6 behavior"}.`,
@@ -315,6 +330,9 @@ function inferRationale(
 
   if (blockers.length > 0) {
     rationale.push(`Blocked by fixture/control need: ${blockers[0]}`);
+  }
+  if (prdContext?.module) {
+    rationale.push(`PRD context matched module ${prdContext.module.name} (${prdContext.confidence}).`);
   }
 
   return rationale;
@@ -384,7 +402,7 @@ function formatTriageReport(map: AutomationMap): string {
     .map(([executor, count]) => `- \`${executor}\`: ${count}`)
     .join("\n");
 
-  return `# R6 Automation Triage
+  return `# ${map.release} Automation Triage
 
 Generated: ${map.generated_at}
 
@@ -394,6 +412,7 @@ Generated: ${map.generated_at}
 - Priority: P0 ${map.summary.by_priority.P0}, P1 ${map.summary.by_priority.P1}, P2 ${map.summary.by_priority.P2}, P3 ${map.summary.by_priority.P3}
 - Readiness: implemented ${map.summary.by_readiness.implemented}, candidate ${map.summary.by_readiness.candidate}, needs fixture/control ${map.summary.by_readiness.needs_fixture}, manual review ${map.summary.by_readiness.manual_review}
 - Complexity: low ${map.summary.by_complexity.low}, medium ${map.summary.by_complexity.medium}, high ${map.summary.by_complexity.high}
+${map.prd_context ? `- PRD context: ${map.prd_context.extraction_status}; modules ${map.prd_context.modules.join(", ") || "none inferred"}` : "- PRD context: not available"}
 
 ## Proposed R6 Main Flow
 
@@ -449,4 +468,14 @@ function caseText(testCase: NormalizedCase): string {
 
 function escapePipe(value: string): string {
   return value.replaceAll("|", "\\|").replace(/\s+/g, " ").trim();
+}
+
+function normalizeKey(value: string): string {
+  return value
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "") || "unknown";
 }

@@ -91,6 +91,22 @@ test("dynamic action plan treats menu navigation as page discovery instead of a 
   );
 });
 
+test("dynamic action plan treats navigate back steps as navigation", () => {
+  const plan = buildDynamicActionPlan(
+    fakeCase({
+      steps: ["Navigate back to the list page."],
+      expectedResult: ["The list page is shown again."]
+    })
+  );
+
+  expect(plan.steps[0]).toEqual(
+    expect.objectContaining({
+      action: "navigate",
+      target: "back"
+    })
+  );
+});
+
 test("dynamic action plan does not treat typed values as field targets", () => {
   const plan = buildDynamicActionPlan(
     fakeCase({
@@ -154,6 +170,23 @@ test("dynamic action plan parses unquoted selection values", () => {
       action: "select",
       target: "Status dropdown",
       value: "In Progress"
+    })
+  );
+});
+
+test("dynamic action plan parses quoted set field and option values", () => {
+  const plan = buildDynamicActionPlan(
+    fakeCase({
+      steps: ['As admin, set "Who can view campaign" to "Employee [BA]".'],
+      expectedResult: ["Only matching creators can view the campaign."]
+    })
+  );
+
+  expect(plan.steps[0]).toEqual(
+    expect.objectContaining({
+      action: "select",
+      target: "Who can view campaign",
+      value: "Employee [BA]"
     })
   );
 });

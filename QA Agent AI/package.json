@@ -1,0 +1,15 @@
+{
+  "name": "gro-qa-agent-ai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "plan": "node src/cli.mjs plan",
+    "run": "node src/cli.mjs run",
+    "check": "node src/cli.mjs check",
+    "demo": "node src/cli.mjs plan --case examples/single-case.json --prd examples/prd-summary.md --out reports/demo-plan.json --offline"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

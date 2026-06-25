@@ -1,4 +1,5 @@
-import type { NormalizedCase, Site } from "../types.js";
+import type { NormalizedCase, PrdCaseContext, PrdKnowledgePack, Site } from "../types.js";
+import { findPrdContextForCase } from "../knowledge/prdKnowledge.js";
 
 export type UnderstandingConfidence = "high" | "medium" | "low";
 
@@ -33,6 +34,7 @@ export interface CaseUnderstanding {
   preconditions: UnderstandingItem[];
   assertions: UnderstandingItem[];
   routeHints: RouteHints;
+  prdContext?: PrdCaseContext;
   evidence: string[];
 }
 
@@ -44,6 +46,8 @@ export interface UnderstandingItem {
 export interface RouteHints {
   moduleLabels: string[];
   candidateRoutes: string[];
+  fieldLabels: string[];
+  actionLabels: string[];
 }
 
 interface ModuleDefinition {
@@ -157,10 +161,14 @@ const MODULE_DEFINITIONS: ModuleDefinition[] = [
   }
 ];
 
-export function understandCase(testCase: NormalizedCase): CaseUnderstanding {
+export function understandCase(testCase: NormalizedCase, prdKnowledge?: PrdKnowledgePack): CaseUnderstanding {
   const text = caseText(testCase);
+  const prdContext = findPrdContextForCase(testCase, prdKnowledge);
   const site = inferSiteFromText(text, testCase.site);
-  const moduleDefinition = inferModuleDefinition(text, testCase.module);
+  const moduleDefinition = inferModuleDefinition(
+    prdContext?.module ? `${prdContext.module.name} ${prdContext.module.aliases.join(" ")} ${text}` : text,
+    prdContext?.module?.name ?? testCase.module
+  );
   const action = inferAction(text);
   const preconditions = inferPreconditions(testCase.precondition);
   const assertions = testCase.expected_result.map((expected) => ({
@@ -170,9 +178,20 @@ export function understandCase(testCase: NormalizedCase): CaseUnderstanding {
   const requiredCapabilities = inferRequiredCapabilities(site.site, moduleDefinition.key, action);
   const moduleConfidence = moduleDefinition.key === "unknown"
     ? "low"
+    : prdContext?.module
+      ? prdContext.confidence
     : moduleDefinition.name === testCase.module
       ? "high"
       : "medium";
+  const moduleLabels = mergeUnique([
+    ...moduleDefinition.labels,
+    ...(prdContext?.module ? [prdContext.module.name, ...prdContext.module.aliases] : []),
+    ...(prdContext?.pages.flatMap((page) => [page.name, ...page.aliases]) ?? [])
+  ]);
+  const candidateRoutes = mergeUnique([
+    ...(site.site === "admin" ? moduleDefinition.adminRoutes : []),
+    ...(prdContext?.pages.flatMap((page) => page.candidate_routes) ?? [])
+  ]);
 
   return {
     caseId: testCase.stable_id,
@@ -188,13 +207,17 @@ export function understandCase(testCase: NormalizedCase): CaseUnderstanding {
     preconditions,
     assertions,
     routeHints: {
-      moduleLabels: moduleDefinition.labels,
-      candidateRoutes: site.site === "admin" ? moduleDefinition.adminRoutes : []
+      moduleLabels,
+      candidateRoutes,
+      fieldLabels: prdContext?.fields.map((field) => field.name) ?? [],
+      actionLabels: prdContext?.actions.map((actionHint) => actionHint.name) ?? []
     },
+    prdContext,
     evidence: [
       `site=${site.site} (${site.confidence})`,
       `module=${moduleDefinition.name} (${moduleConfidence})`,
-      `action=${action}`
+      `action=${action}`,
+      ...(prdContext?.evidence ?? [])
     ]
   };
 }
@@ -327,4 +350,8 @@ function normalizeKey(value: string): string {
     .replace(/[^a-zA-Z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "")
     .toLowerCase();
+}
+
+function mergeUnique(values: string[]): string[] {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }

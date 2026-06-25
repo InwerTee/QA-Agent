@@ -3,6 +3,11 @@ import path from "node:path";
 import readXlsxFile from "read-excel-file/node";
 import type { CellValue, Row, Sheet } from "read-excel-file/node";
 import type { AutomationStatus, CaseDependency, NormalizedCase, Site } from "../types.js";
+import {
+  buildPrdKnowledgePack,
+  casePrdContextForOutput,
+  summarizePrdKnowledge
+} from "../knowledge/prdKnowledge.js";
 import { inferModuleNameFromText } from "../understanding/caseUnderstanding.js";
 
 interface PrepareOptions {
@@ -17,6 +22,7 @@ export interface PrepareResult {
   outDir: string;
   manifestPath: string;
   casesPath: string;
+  prdKnowledgePath: string;
   reportPath: string;
   caseCount: number;
   sheet: string;
@@ -82,10 +88,22 @@ export async function prepareInputPackage(
       path.basename(inputDir)
     ]);
   const title = inferTitle(workbook.metadata, release);
-  const cases = parseCases(workbook, release, files.workbookPath);
   const outDir = path.resolve(options.outDir ?? path.join("inputs", release));
+  const parsedCases = parseCases(workbook, release, files.workbookPath);
 
   await mkdir(outDir, { recursive: true });
+  const prdKnowledge = await buildPrdKnowledgePack({
+    release,
+    title,
+    prdPath: files.prdPath,
+    cases: parsedCases,
+    outDir
+  });
+  const prdKnowledgePath = path.join(outDir, "prd_knowledge.json");
+  const cases = parsedCases.map((testCase) => ({
+    ...testCase,
+    prd_context: casePrdContextForOutput(testCase, prdKnowledge, relativePath(prdKnowledgePath))
+  }));
 
   const manifest = buildManifest({
     release,
@@ -94,7 +112,9 @@ export async function prepareInputPackage(
     outDir,
     files,
     workbook,
-    cases
+    cases,
+    prdKnowledgePath,
+    prdKnowledge
   });
   const report = formatIngestionReport({
     release,
@@ -102,7 +122,9 @@ export async function prepareInputPackage(
     inputDir: absoluteInputDir,
     files,
     workbook,
-    cases
+    cases,
+    prdKnowledgePath,
+    prdKnowledge
   });
 
   const manifestPath = path.join(outDir, "manifest.json");
@@ -111,6 +133,7 @@ export async function prepareInputPackage(
 
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   await writeFile(casesPath, `${JSON.stringify(cases, null, 2)}\n`);
+  await writeFile(prdKnowledgePath, `${JSON.stringify(prdKnowledge, null, 2)}\n`);
   await writeFile(reportPath, report);
 
   return {
@@ -120,6 +143,7 @@ export async function prepareInputPackage(
     outDir,
     manifestPath,
     casesPath,
+    prdKnowledgePath,
     reportPath,
     caseCount: cases.length,
     sheet: workbook.sheet,
@@ -669,6 +693,8 @@ function buildManifest(input: {
   files: InputFiles;
   workbook: ParsedWorkbook;
   cases: NormalizedCase[];
+  prdKnowledgePath: string;
+  prdKnowledge: Awaited<ReturnType<typeof buildPrdKnowledgePack>>;
 }): Record<string, unknown> {
   return {
     release: input.release,
@@ -678,9 +704,15 @@ function buildManifest(input: {
     prd: input.files.prdPath
       ? {
           path: relativePath(input.files.prdPath),
-          role: "business_context"
+          role: "business_context",
+          knowledge_pack: relativePath(input.prdKnowledgePath)
         }
-      : undefined,
+      : {
+          role: "business_context",
+          knowledge_pack: relativePath(input.prdKnowledgePath),
+          warning: "No PRD file was found; knowledge pack was generated from workbook context only."
+        },
+    prd_knowledge: summarizePrdKnowledge(input.prdKnowledge),
     test_case_source: {
       workbook: relativePath(input.files.workbookPath),
       sheet: input.workbook.sheet,
@@ -709,6 +741,8 @@ function formatIngestionReport(input: {
   files: InputFiles;
   workbook: ParsedWorkbook;
   cases: NormalizedCase[];
+  prdKnowledgePath: string;
+  prdKnowledge: Awaited<ReturnType<typeof buildPrdKnowledgePack>>;
 }): string {
   const automation = summarizeAutomation(input.cases);
   const groups = Array.from(
@@ -724,6 +758,7 @@ function formatIngestionReport(input: {
 
 - Input package: \`${relativePath(input.inputDir)}\`
 - PRD: \`${input.files.prdPath ? relativePath(input.files.prdPath) : "not found"}\`
+- PRD knowledge: \`${relativePath(input.prdKnowledgePath)}\`
 - Test cases: \`${relativePath(input.files.workbookPath)}\`
 - Sheet: \`${input.workbook.sheet}\`
 - Header row: ${input.workbook.headerRowIndex + 1}
@@ -736,6 +771,9 @@ function formatIngestionReport(input: {
 - Ready for current executor: ${automation.ready}
 - Needs executor / selector mapping: ${automation.needs_mapping}
 - Manual review suggested: ${automation.manual_review}
+- PRD extraction: ${input.prdKnowledge.extraction.status} via ${input.prdKnowledge.extraction.method}
+- PRD modules: ${input.prdKnowledge.modules.map((module) => module.name).join(", ") || "none inferred"}
+- PRD pages: ${input.prdKnowledge.pages.slice(0, 8).map((page) => page.name).join(", ") || "none inferred"}
 
 ## Scenario Groups
 

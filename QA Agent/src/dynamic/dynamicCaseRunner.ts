@@ -1,13 +1,16 @@
 import path from "node:path";
 import { mkdir } from "node:fs/promises";
 import type { Locator, Page } from "@playwright/test";
+import { AGENT_BUILD_LABEL } from "../runtime/agentVersion.js";
 import type { RuntimeConfig } from "../runtime/config.js";
 import type {
   CaseExecutionTrace,
   CaseResult,
   NormalizedCase,
+  PrdKnowledgePack,
   QaStatus,
   ResultConfidence,
+  TestCaseIR,
   TraceCoverageSummary,
   TraceEntry
 } from "../types.js";
@@ -22,6 +25,7 @@ import {
   type DynamicActionPlan,
   type DynamicActionStep
 } from "./actionPlan.js";
+import { buildRuntimeTestCaseIR, type TestCaseIRBuildResult } from "./llmTestCaseIR.js";
 import { observePage, type BrowserObservation } from "./browserObservation.js";
 import {
   describeResolution,
@@ -42,6 +46,8 @@ import {
 interface DynamicRunOptions {
   adminSession?: AdminPageSession;
   siteSession?: AdminPageSession;
+  prdKnowledge?: PrdKnowledgePack;
+  irBuild?: TestCaseIRBuildResult;
 }
 
 interface DynamicStepResult {
@@ -60,7 +66,7 @@ interface ScopedActionAttempt {
 interface ExpectedAssertionResult {
   expectedIndex: number;
   expectedText: string;
-  status: "passed" | "failed" | "manual";
+  status: "passed" | "failed" | "manual" | "setup_blocked";
   confidence: ResultConfidence;
   actual: string;
   notes: string[];
@@ -101,7 +107,8 @@ export async function runDynamicCase(
   options: DynamicRunOptions = {}
 ): Promise<CaseResult> {
   const plan = buildDynamicActionPlan(testCase);
-  const understanding = understandCase(testCase);
+  const understanding = understandCase(testCase, options.prdKnowledge);
+  const irBuild = options.irBuild ?? (await buildRuntimeTestCaseIR(testCase, plan, config));
 
   const session = options.siteSession ?? (understanding.site === "admin" ? options.adminSession : undefined);
   if (!session) {
@@ -113,7 +120,8 @@ export async function runDynamicCase(
       actualResult: `No ${understanding.site} browser session was available for dynamic execution.`,
       failureReason: `${understanding.site} session is missing.`,
       stepResults: [],
-      extraNotes: formatUnderstandingNotes(understanding)
+      irBuild,
+      extraNotes: [...formatUnderstandingNotes(understanding), ...irBuild.notes]
     });
   }
 
@@ -147,7 +155,8 @@ export async function runDynamicCase(
         evidencePath,
         stepResults,
         lastObservation,
-        extraNotes: [...formatUnderstandingNotes(understanding), ...discoveryNotes]
+        irBuild,
+        extraNotes: [...formatUnderstandingNotes(understanding), ...discoveryNotes, ...irBuild.notes]
       });
     }
 
@@ -168,7 +177,8 @@ export async function runDynamicCase(
           failureReason: result.actual,
           evidencePath,
           stepResults,
-          lastObservation
+          lastObservation,
+          irBuild
         });
       }
     }
@@ -200,10 +210,11 @@ export async function runDynamicCase(
       evidence_path: evidencePath,
       created_test_data: [],
       depends_on_data: [],
-      traceability: buildDynamicTrace(testCase, plan, stepResults, assertionResults),
+      traceability: buildDynamicTrace(testCase, plan, stepResults, assertionResults, irBuild.ir),
       notes: [
-        "v0.10 dynamic runner used case understanding, page discovery, generic browser actions, and confidence-gated assertions rather than a prewritten case executor.",
+        `${AGENT_BUILD_LABEL} dynamic runner used case understanding, page discovery, generic browser actions, and confidence-gated assertions rather than a prewritten case executor.`,
         ...formatUnderstandingNotes(understanding),
+        ...irBuild.notes,
         ...discoveryNotes,
         ...formatAppliedFilterNotes(executionContext.appliedFilters),
         ...formatFilterSubmissionNotes(executionContext.filterSubmissions),
@@ -228,7 +239,8 @@ export async function runDynamicCase(
       evidencePath,
       stepResults,
       lastObservation,
-      extraNotes: [...formatUnderstandingNotes(understanding), ...discoveryNotes]
+      irBuild,
+      extraNotes: [...formatUnderstandingNotes(understanding), ...discoveryNotes, ...irBuild.notes]
     });
   }
 }
@@ -253,6 +265,16 @@ async function executeDynamicStep(
   }
 
   if (step.action === "navigate") {
+    if (normalizeText(step.target ?? step.sourceText) === "back" || /\bnavigate\s+back\b|\bgo\s+back\b|\bback\s+to\b/i.test(step.sourceText)) {
+      await page.goBack({ waitUntil: "domcontentloaded", timeout: 8000 }).catch(() => undefined);
+      await waitForUiSettle(page);
+      return {
+        planStep: step,
+        status: "completed",
+        actual: "Navigated back to the previous page."
+      };
+    }
+
     return {
       planStep: step,
       status: "completed",
@@ -302,6 +324,28 @@ async function executeDynamicStep(
       };
     }
 
+    const scopedClick = await resolveVisibleScopedClickTarget(page, target);
+    if (scopedClick) {
+      await scopedClick.locator.click({ timeout: 5000 });
+      await waitForUiSettle(page);
+      return {
+        planStep: step,
+        status: "completed",
+        actual: `Clicked "${target}". ${scopedClick.reason}`
+      };
+    }
+
+    const tableLink = await resolveTableHyperlinkTarget(page, target, step.sourceText);
+    if (tableLink) {
+      await tableLink.locator.click({ timeout: 5000 });
+      await waitForUiSettle(page);
+      return {
+        planStep: step,
+        status: "completed",
+        actual: `Clicked table hyperlink "${target}". ${tableLink.reason}`
+      };
+    }
+
     const resolution = resolveClickTarget(page, observation, {
       action: "click",
       target,
@@ -312,6 +356,7 @@ async function executeDynamicStep(
       const rowScopedAction = await resolveRowScopedActionTarget(page, target, step.sourceText);
       if (rowScopedAction) {
         await rowScopedAction.locator.click({ timeout: 5000 });
+        await waitForUiSettle(page);
         return {
           planStep: step,
           status: "completed",
@@ -323,6 +368,7 @@ async function executeDynamicStep(
     }
 
     await resolution.locator.click({ timeout: 5000 });
+    await waitForUiSettle(page);
     return {
       planStep: step,
       status: "completed",
@@ -1159,12 +1205,122 @@ function shouldOpenFilterBeforeSelect(step: DynamicActionStep): boolean {
   return /\b(filter|criteria)\b/i.test(step.sourceText) || /\b(filter|platform|status|employee|followers|account type)\b/i.test(step.target ?? "");
 }
 
+async function waitForUiSettle(page: Page): Promise<void> {
+  await page.waitForLoadState("domcontentloaded", { timeout: 3000 }).catch(() => undefined);
+  await page.waitForTimeout(700);
+}
+
+async function resolveVisibleScopedClickTarget(
+  page: Page,
+  target: string
+): Promise<{ locator: Locator; reason: string } | undefined> {
+  const label = clickableLabelFromTarget(target);
+  if (!label) return undefined;
+
+  const scopes = [
+    page.locator(".el-dialog:visible, .el-dialog__wrapper:visible, [role='dialog']:visible").last(),
+    page.locator(".el-drawer:visible, .el-drawer__body:visible").last(),
+    page.locator(".el-popover:visible, .el-popper:visible, [role='tooltip']:visible").last()
+  ];
+
+  for (const scope of scopes) {
+    if (!(await scope.isVisible({ timeout: 250 }).catch(() => false))) {
+      continue;
+    }
+
+    const action = scope
+      .locator('button:visible, a:visible, [role="button"]:visible, [role="link"]:visible, .el-button:visible')
+      .filter({ hasText: new RegExp(`^\\s*${escapeRegExp(label)}\\s*$`, "i") })
+      .first();
+
+    if (await action.isVisible({ timeout: 300 }).catch(() => false)) {
+      return {
+        locator: action,
+        reason: `Resolved exact "${label}" action inside the currently visible dialog/drawer/popup.`
+      };
+    }
+  }
+
+  return undefined;
+}
+
+async function resolveTableHyperlinkTarget(
+  page: Page,
+  target: string,
+  sourceText: string
+): Promise<{ locator: Locator; reason: string } | undefined> {
+  const normalized = normalizeText(`${target} ${sourceText}`);
+  if (!/\b(user\s*name|username|creator\s*name|name)\b/.test(normalized) || !/\b(row|hyperlink|linked|link)\b/.test(normalized)) {
+    return undefined;
+  }
+
+  await waitForFirstVisibleDataRow(page);
+
+  const elementTableLink = page
+    .locator(".el-table__fixed .el-table__row:visible")
+    .first()
+    .locator('a:visible, [role="link"]:visible, .hover-link:visible, .cur-p:visible, .pointer:visible')
+    .first();
+
+  if (await elementTableLink.isVisible({ timeout: 500 }).catch(() => false)) {
+    return {
+      locator: elementTableLink,
+      reason: "Resolved the first visible data-row link from the Element UI fixed identity column."
+    };
+  }
+
+  const elementBodyLink = page
+    .locator(".el-table__body-wrapper .el-table__row:visible")
+    .first()
+    .locator('a:visible, [role="link"]:visible, .hover-link:visible, .cur-p:visible, .pointer:visible')
+    .first();
+
+  if (await elementBodyLink.isVisible({ timeout: 500 }).catch(() => false)) {
+    return {
+      locator: elementBodyLink,
+      reason: "Resolved the first visible data-row link from the Element UI table body."
+    };
+  }
+
+  const standardTableLink = page
+    .locator("table:visible tbody tr:visible")
+    .first()
+    .locator('a:visible, [role="link"]:visible, .hover-link:visible, .cur-p:visible, .pointer:visible')
+    .first();
+
+  if (await standardTableLink.isVisible({ timeout: 500 }).catch(() => false)) {
+    return {
+      locator: standardTableLink,
+      reason: "Resolved the first visible data-row link from a standard table."
+    };
+  }
+
+  return undefined;
+}
+
+function clickableLabelFromTarget(target: string): string | undefined {
+  const label = target
+    .replace(/\b(the|a|an)\b/gi, " ")
+    .replace(/\b(button|link|hyperlink|control|icon)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return label.length > 0 ? label : undefined;
+}
+
 async function resolveRowScopedActionTarget(
   page: Page,
   target: string,
   sourceText: string
 ): Promise<{ locator: Locator; reason: string } | undefined> {
-  if (!isRowScopedAction(target)) return undefined;
+  const actionLabel = rowScopedActionLabel(`${target} ${sourceText}`);
+  if (!actionLabel) return undefined;
+
+  const quoted = quotedTexts(sourceText).filter((value) => normalizeText(value) !== normalizeText(target));
+  const elementTableAction = await resolveElementTableRowActionTarget(page, actionLabel, quoted);
+  if (elementTableAction) {
+    return elementTableAction;
+  }
 
   const rowLocator = page.locator(
     'table:visible tbody tr:visible, .el-table__body-wrapper tr:visible'
@@ -1185,18 +1341,22 @@ async function resolveRowScopedActionTarget(
 
   if (rows.length === 0) return undefined;
 
-  const quoted = quotedTexts(sourceText).filter((value) => normalizeText(value) !== normalizeText(target));
   const matchingRows = quoted.length > 0
     ? rows.filter((row) => quoted.some((value) => row.text.toLowerCase().includes(value.toLowerCase())))
     : rows;
   const uniqueRows = dedupeRowsByText(matchingRows);
 
-  if (uniqueRows.length !== 1) return undefined;
+  const selectedRow = quoted.length > 0
+    ? uniqueRows.length === 1
+      ? uniqueRows[0]
+      : undefined
+    : uniqueRows[0];
+  if (!selectedRow) return undefined;
 
-  const row = rowLocator.nth(uniqueRows[0].index);
+  const row = rowLocator.nth(selectedRow.index);
   const action = row
     .locator('button:visible, a:visible, [role="button"]:visible, .el-button:visible')
-    .filter({ hasText: new RegExp(`^\\s*${escapeRegExp(target)}\\s*$`, "i") })
+    .filter({ hasText: new RegExp(`^\\s*${escapeRegExp(actionLabel)}\\s*$`, "i") })
     .first();
 
   if (!(await action.isVisible({ timeout: 800 }).catch(() => false))) {
@@ -1205,11 +1365,88 @@ async function resolveRowScopedActionTarget(
 
   const context = quoted.length > 0
     ? `matched row context "${quoted.join(", ")}"`
-    : "current table had one unique data row";
+    : "no row context was provided, so the first visible data row was used";
   return {
     locator: action,
     reason: `Resolved from row context because ${context}.`
   };
+}
+
+async function resolveElementTableRowActionTarget(
+  page: Page,
+  actionLabel: string,
+  quotedContext: string[]
+): Promise<{ locator: Locator; reason: string } | undefined> {
+  await waitForFirstVisibleDataRow(page);
+
+  const rightRows = page.locator(".el-table__fixed-right .el-table__row:visible");
+  const rightCount = await rightRows.count().catch(() => 0);
+  if (rightCount === 0) return undefined;
+
+  let rowIndex = 0;
+  let contextReason = "no row context was provided, so the first visible operation row was used";
+
+  if (quotedContext.length > 0) {
+    const rowTexts = await elementTableRowTexts(page, rightCount);
+    const matches = rowTexts.filter((row) =>
+      quotedContext.some((value) => row.text.toLowerCase().includes(value.toLowerCase()))
+    );
+
+    if (matches.length !== 1) {
+      return undefined;
+    }
+
+    rowIndex = matches[0].index;
+    contextReason = `matched Element UI split-table row context "${quotedContext.join(", ")}"`;
+  }
+
+  const action = rightRows
+    .nth(rowIndex)
+    .locator('button:visible, a:visible, [role="button"]:visible, .el-button:visible')
+    .filter({ hasText: new RegExp(`^\\s*${escapeRegExp(actionLabel)}\\s*$`, "i") })
+    .first();
+
+  if (!(await action.isVisible({ timeout: 800 }).catch(() => false))) {
+    return undefined;
+  }
+
+  return {
+    locator: action,
+    reason: `Resolved "${actionLabel}" from Element UI split-table operation column because ${contextReason}.`
+  };
+}
+
+async function waitForFirstVisibleDataRow(page: Page): Promise<void> {
+  const row = page
+    .locator(
+      ".el-table__fixed-right .el-table__row:visible, .el-table__fixed .el-table__row:visible, .el-table__body-wrapper .el-table__row:visible, table:visible tbody tr:visible"
+    )
+    .first();
+  await row.waitFor({ state: "visible", timeout: 8000 }).catch(() => undefined);
+}
+
+async function elementTableRowTexts(page: Page, limit: number): Promise<Array<{ index: number; text: string }>> {
+  const leftRows = page.locator(".el-table__fixed .el-table__row:visible");
+  const bodyRows = page.locator(".el-table__body-wrapper .el-table__row:visible");
+  const rowTexts: Array<{ index: number; text: string }> = [];
+
+  for (let index = 0; index < Math.min(limit, 20); index += 1) {
+    const leftText = await leftRows
+      .nth(index)
+      .innerText({ timeout: 300 })
+      .catch(() => "");
+    const bodyText = await bodyRows
+      .nth(index)
+      .innerText({ timeout: 300 })
+      .catch(() => "");
+    const text = `${leftText} ${bodyText}`.replace(/\s+/g, " ").trim();
+
+    if (text && !/no data|no results/i.test(text)) {
+      rowTexts.push({ index, text });
+    }
+  }
+
+  return rowTexts;
 }
 
 function dedupeRowsByText(rows: Array<{ index: number; text: string }>): Array<{ index: number; text: string }> {
@@ -1227,7 +1464,18 @@ function dedupeRowsByText(rows: Array<{ index: number; text: string }>): Array<{
 }
 
 function isRowScopedAction(value: string): boolean {
-  return /^(edit|view|details?|detail|delete|remove|approve|reject|copy|duplicate)$/i.test(value.trim());
+  return Boolean(rowScopedActionLabel(value));
+}
+
+function rowScopedActionLabel(value: string): string | undefined {
+  const normalized = normalizeText(value);
+  if (/\b(edit|modify)\b/.test(normalized)) return "Edit";
+  if (/\b(view|details?|detail)\b/.test(normalized)) return "Detail";
+  if (/\bdelete|remove\b/.test(normalized)) return "Delete";
+  if (/\bapprove\b/.test(normalized)) return "Approve";
+  if (/\breject\b/.test(normalized)) return "Reject";
+  if (/\bcopy|duplicate\b/.test(normalized)) return "Copy";
+  return undefined;
 }
 
 async function checkTableAfterFill(
@@ -1275,7 +1523,8 @@ function classifyDynamicOutcome(
 ): DynamicOutcomeClassification {
   const failed = assertionResults.filter((result) => result.status === "failed");
   const manual = assertionResults.filter((result) => result.status === "manual");
-  const checked = assertionResults.filter((result) => result.status !== "manual");
+  const setupBlocked = assertionResults.filter((result) => result.status === "setup_blocked");
+  const checked = assertionResults.filter((result) => result.status === "passed" || result.status === "failed");
   const completedSteps = stepResults.filter((result) => result.status === "completed").length;
   const allStepsCompleted = completedSteps === plan.steps.length;
   const highConfidenceFailed = failed.filter((result) => result.confidence === "high");
@@ -1303,6 +1552,14 @@ function classifyDynamicOutcome(
       confidence: "medium",
       reason:
         "One or more generic assertions failed, but confidence was not high enough to classify this as a product bug."
+    };
+  }
+
+  if (setupBlocked.length > 0 && allStepsCompleted) {
+    return {
+      status: "SETUP_BLOCKED",
+      confidence: "medium",
+      reason: `The case executed, but expected result data was not available for verification: ${setupBlocked[0].actual}`
     };
   }
 
@@ -1348,6 +1605,10 @@ function formatDynamicActualResult(
     return `Dynamic runner completed ${completed}/${total} planned step(s), and all high-confidence generic expected assertions passed.`;
   }
 
+  if (outcome.status === "SETUP_BLOCKED") {
+    return `Dynamic runner completed ${completed}/${total} planned step(s), but required verification data was unavailable. ${assertionSummary} Classification: ${outcome.reason}`;
+  }
+
   return `Dynamic runner completed ${completed}/${total} planned step(s). ${assertionSummary} Classification: ${outcome.reason}`;
 }
 
@@ -1383,6 +1644,23 @@ async function evaluateExpectedResult(
     };
   }
 
+  if (/no data|no results|no records|empty state/.test(normalizedExpected)) {
+    const rowCount = observation.tables.reduce((total, table) => total + table.rowCount, 0);
+    const hasEmptyState = /no data|no results|no records|empty/i.test(visibleText);
+    const passed = hasEmptyState || rowCount === 0;
+
+    return {
+      expectedIndex,
+      expectedText: expected,
+      status: passed ? "passed" : "failed",
+      confidence: "high",
+      actual: passed
+        ? "Observed an empty result state or zero table rows."
+        : `Expected an empty result state, but observed ${rowCount} table row(s).`,
+      notes: ["Generic empty-state expected assertion."]
+    };
+  }
+
   if (isFilterResultExpected(normalizedExpected) && context.appliedFilters.length > 0) {
     const filterCheck = checkTableRowsMatchFilters(observation, context.appliedFilters);
     const submitted = filtersSubmittedForAssertion(context);
@@ -1393,6 +1671,8 @@ async function evaluateExpectedResult(
       status:
         !submitted || filterCheck.status === "not_checkable"
           ? "manual"
+          : filterCheck.status === "no_rows"
+            ? "setup_blocked"
           : filterCheck.status === "failed"
             ? "failed"
             : filterCheck.status === "passed"
@@ -1401,15 +1681,32 @@ async function evaluateExpectedResult(
       confidence:
         !submitted || filterCheck.status === "not_checkable"
           ? "medium"
+          : filterCheck.status === "no_rows"
+            ? "medium"
           : filterCheck.status === "passed" || filterCheck.status === "failed"
             ? "high"
             : "medium",
-      actual: filterCheck.actual,
+      actual:
+        filterCheck.status === "no_rows"
+          ? `${filterCheck.actual} The applied filter combination may need seed/test data before this expected result can be verified.`
+          : filterCheck.actual,
       notes: [
         "Generic table filter assertion based on applied filters and sampled table rows.",
         `Applied filters: ${formatAppliedFilters(context.appliedFilters)}.`,
         ...formatFilterSubmissionNotes(context.filterSubmissions)
       ]
+    };
+  }
+
+  if (isDownloadedFileExpected(normalizedExpected)) {
+    return {
+      expectedIndex,
+      expectedText: expected,
+      status: "manual",
+      confidence: "low",
+      actual:
+        "Expected result requires downloaded/generated file content verification, which the generic runner cannot inspect yet.",
+      notes: ["Downloaded-file content assertions are intentionally left for manual review until download parsing is implemented."]
     };
   }
 
@@ -1442,23 +1739,6 @@ async function evaluateExpectedResult(
         notes: ["Generic sampled table null-display assertion."]
       };
     }
-  }
-
-  if (/no data|no results|no records|empty state/.test(normalizedExpected)) {
-    const rowCount = observation.tables.reduce((total, table) => total + table.rowCount, 0);
-    const hasEmptyState = /no data|no results|no records|empty/i.test(visibleText);
-    const passed = hasEmptyState || rowCount === 0;
-
-    return {
-      expectedIndex,
-      expectedText: expected,
-      status: passed ? "passed" : "failed",
-      confidence: "high",
-      actual: passed
-        ? "Observed an empty result state or zero table rows."
-        : `Expected an empty result state, but observed ${rowCount} table row(s).`,
-      notes: ["Generic empty-state expected assertion."]
-    };
   }
 
   if (isValidationExpected(normalizedExpected)) {
@@ -1509,6 +1789,33 @@ async function evaluateExpectedResult(
   }
 
   const displayedValue = quoted[0];
+  if (displayedValue && isCrossRoleVisibilityExpected(normalizedExpected)) {
+    return {
+      expectedIndex,
+      expectedText: expected,
+      status: "manual",
+      confidence: "low",
+      actual:
+        "Cross-role visibility requires a role-specific session and cannot be classified by text presence on the current page alone.",
+      notes: ["Generic visible-text assertion intentionally skipped for cross-role visibility."]
+    };
+  }
+
+  if (displayedValue && isNegativeVisibilityExpected(normalizedExpected)) {
+    const passed = !normalizeText(visibleText).includes(normalizeText(displayedValue));
+
+    return {
+      expectedIndex,
+      expectedText: expected,
+      status: passed ? "passed" : "failed",
+      confidence: "medium",
+      actual: passed
+        ? `Expected text "${displayedValue}" was not observed, matching the negative visibility expectation.`
+        : `Expected text "${displayedValue}" not to be visible, but it was observed in the page text.`,
+      notes: ["Generic negative visible-text expected assertion."]
+    };
+  }
+
   if (displayedValue && /\b(display|shown|show|visible|appear|list|table|result|row|field)\b/.test(normalizedExpected)) {
     const passed = normalizeText(visibleText).includes(normalizeText(displayedValue));
 
@@ -1538,7 +1845,8 @@ function formatAssertionSummary(results: ExpectedAssertionResult[]): string {
   const passed = results.filter((result) => result.status === "passed").length;
   const failed = results.filter((result) => result.status === "failed").length;
   const manual = results.filter((result) => result.status === "manual").length;
-  return `Generic expected assertions: ${passed} passed, ${failed} failed, ${manual} require review.`;
+  const setupBlocked = results.filter((result) => result.status === "setup_blocked").length;
+  return `Generic expected assertions: ${passed} passed, ${failed} failed, ${setupBlocked} setup/data blocked, ${manual} require review.`;
 }
 
 function isSearchResultExpected(normalizedExpected: string): boolean {
@@ -1563,6 +1871,24 @@ function filtersSubmittedForAssertion(context: DynamicExecutionContext): boolean
 
 function isValidationExpected(normalizedExpected: string): boolean {
   return /\b(required|mandatory|invalid|validation|toast|error|warning|missing|failed|failure|cannot save|not allow|not allowed)\b/.test(normalizedExpected);
+}
+
+function isCrossRoleVisibilityExpected(normalizedExpected: string): boolean {
+  return (
+    /\b(creator|agency|employee|non employee|non-employee|account type|approved creator)\b/.test(normalizedExpected) &&
+    /\b(sees?|does not see|visible|visibility|campaign|list)\b/.test(normalizedExpected)
+  );
+}
+
+function isNegativeVisibilityExpected(normalizedExpected: string): boolean {
+  return /\b(does not see|do not see|should not see|not visible|not shown|not displayed|does not appear|should not appear)\b/.test(normalizedExpected);
+}
+
+function isDownloadedFileExpected(normalizedExpected: string): boolean {
+  return (
+    /\b(download|downloaded|export|exported|file|excel|log)\b/.test(normalizedExpected) &&
+    /\b(content|contains?|column|rows?|error log|downloaded file|exported file)\b/.test(normalizedExpected)
+  );
 }
 
 function inferExpectedValidationMessages(expected: string, quoted: string[]): string[] {
@@ -1604,13 +1930,19 @@ function normalizeText(value: string): string {
 
 function formatUnderstandingNotes(understanding: CaseUnderstanding): string[] {
   return [
-    `v0.9 case understanding: site=${understanding.site} (${understanding.siteConfidence}), module=${understanding.module} (${understanding.moduleConfidence}), action=${understanding.action}, confidence=${understanding.confidence}.`,
+    `${AGENT_BUILD_LABEL} case understanding: site=${understanding.site} (${understanding.siteConfidence}), module=${understanding.module} (${understanding.moduleConfidence}), action=${understanding.action}, confidence=${understanding.confidence}.`,
     understanding.routeHints.moduleLabels.length
       ? `Module discovery labels: ${understanding.routeHints.moduleLabels.join(" | ")}.`
       : "Module discovery labels: none.",
     understanding.routeHints.candidateRoutes.length
       ? `Candidate routes: ${understanding.routeHints.candidateRoutes.join(" | ")}.`
       : "Candidate routes: none; page discovery will start from the site root.",
+    understanding.routeHints.fieldLabels.length
+      ? `PRD field hints: ${understanding.routeHints.fieldLabels.slice(0, 8).join(" | ")}.`
+      : "PRD field hints: none.",
+    understanding.routeHints.actionLabels.length
+      ? `PRD action hints: ${understanding.routeHints.actionLabels.slice(0, 8).join(" | ")}.`
+      : "PRD action hints: none.",
     understanding.preconditions.length
       ? `Understood preconditions: ${understanding.preconditions.map((item) => `${item.kind}: ${item.text}`).join(" | ")}.`
       : "Understood preconditions: none.",
@@ -1675,6 +2007,7 @@ function dynamicBlockedResult(input: {
   evidencePath?: string;
   stepResults: DynamicStepResult[];
   lastObservation?: BrowserObservation;
+  irBuild?: TestCaseIRBuildResult;
   extraNotes?: string[];
 }): CaseResult {
   return {
@@ -1692,9 +2025,9 @@ function dynamicBlockedResult(input: {
     evidence_path: input.evidencePath,
     created_test_data: [],
     depends_on_data: [],
-    traceability: buildDynamicTrace(input.testCase, input.plan, input.stepResults),
+    traceability: buildDynamicTrace(input.testCase, input.plan, input.stepResults, [], input.irBuild?.ir),
     notes: [
-      "v0.9 dynamic runner attempted this case without requiring a prewritten executor.",
+      `${AGENT_BUILD_LABEL} dynamic runner attempted this case without requiring a prewritten executor.`,
       ...(input.extraNotes ?? []),
       ...formatObservationNotes(input.lastObservation)
     ]
@@ -1736,7 +2069,8 @@ function buildDynamicTrace(
   testCase: NormalizedCase,
   plan: DynamicActionPlan,
   stepResults: DynamicStepResult[],
-  assertionResults: ExpectedAssertionResult[] = []
+  assertionResults: ExpectedAssertionResult[] = [],
+  testCaseIR?: TestCaseIR
 ): CaseExecutionTrace {
   const resultBySource = new Map(
     stepResults.map((result) => [`${result.planStep.source}:${result.planStep.index}`, result])
@@ -1768,7 +2102,7 @@ function buildDynamicTrace(
       source_type: "expected_result" as const,
       source_index: sourceIndex,
       source_text: expected,
-      coverage: assertion && assertion.status !== "manual" ? "covered" as const : "not_covered" as const,
+      coverage: assertion && assertion.status !== "manual" && assertion.status !== "setup_blocked" ? "covered" as const : "not_covered" as const,
       actual_check:
         assertion
           ? `${assertion.actual} (confidence=${assertion.confidence})`
@@ -1792,14 +2126,19 @@ function buildDynamicTrace(
     raw_pre_requisite: testCase.raw_source.pre_requisite,
     raw_test_steps: testCase.raw_source.test_steps,
     raw_expected_result: testCase.raw_source.expected_result,
-    contract_id: `${testCase.stable_id}.dynamic.v0.9`,
+    contract_id: `${testCase.stable_id}.dynamic.${AGENT_BUILD_LABEL}`,
     precondition_trace: preconditionTrace,
     step_trace: stepTrace,
     expected_trace: expectedTrace,
     coverage_summary: summarizeCoverage(entries),
+    test_case_ir: testCaseIR,
     alignment_notes: [
       "Dynamic execution trace was generated from uploaded natural-language steps.",
-      "v0.9 understanding and page discovery were used before generic browser execution.",
+      "Test Case IR v1 records the structured preconditions, actions, and assertions inferred from Paragon text.",
+      testCaseIR
+        ? `Test Case IR source: ${testCaseIR.translation.provider} (${testCaseIR.translation.status}).`
+        : "Test Case IR was not available for this trace.",
+      `${AGENT_BUILD_LABEL} understanding and page discovery were used before generic browser execution.`,
       "This is not a prewritten case-specific executor."
     ]
   };

@@ -41,7 +41,15 @@
       }
 
       header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
         margin-bottom: 24px;
+      }
+
+      .title-block {
+        min-width: 0;
       }
 
       h1 {
@@ -55,6 +63,20 @@
         margin: 0;
         color: var(--muted);
         line-height: 1.5;
+      }
+
+      .version-badge {
+        flex: 0 0 auto;
+        min-height: 28px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 5px 10px;
+        background: var(--surface);
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.4;
+        white-space: nowrap;
       }
 
       .tool {
@@ -248,6 +270,64 @@
         gap: 8px;
       }
 
+      .failure-analysis {
+        display: none;
+        gap: 8px;
+      }
+
+      .failure-analysis.visible {
+        display: grid;
+      }
+
+      .failure-title {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .failure-title strong {
+        font-size: 14px;
+      }
+
+      .failure-title span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .failure-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .failure-row {
+        display: grid;
+        grid-template-columns: minmax(140px, 180px) 64px minmax(0, 1fr);
+        gap: 10px;
+        align-items: start;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 10px;
+        background: var(--surface-2);
+      }
+
+      .failure-row strong,
+      .failure-row span,
+      .failure-row p {
+        min-width: 0;
+      }
+
+      .failure-count {
+        color: var(--text);
+        font-weight: 700;
+      }
+
+      .failure-action {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
       .metric {
         border: 1px solid var(--border);
         border-radius: 6px;
@@ -283,8 +363,17 @@
         }
 
         .grid,
-        .summary {
+        .summary,
+        .failure-row {
           grid-template-columns: 1fr;
+        }
+
+        header {
+          display: grid;
+        }
+
+        .version-badge {
+          justify-self: start;
         }
       }
     </style>
@@ -292,8 +381,13 @@
   <body>
     <main>
       <header>
-        <h1>Gro QA Agent</h1>
-        <p>Local runner for Paragon PRD and test case packages.</p>
+        <div class="title-block">
+          <h1>Gro QA Agent</h1>
+          <p>Local runner for Paragon PRD and test case packages.</p>
+        </div>
+        <div id="version-badge" class="version-badge" title="Version of the currently running local server">
+          Agent version: loading
+        </div>
       </header>
 
       <section class="tool" aria-label="QA Agent local runner">
@@ -352,6 +446,7 @@
 
         <section id="results" class="results" aria-label="Run results">
           <div class="summary" id="summary"></div>
+          <div id="failure-analysis" class="failure-analysis"></div>
           <div class="actions">
             <a id="filled-excel" class="download-link" href="#">Download filled Excel</a>
             <a id="report-md" class="download-link" href="#">Download report</a>
@@ -374,7 +469,9 @@
       const progressSummary = document.getElementById("progress-summary");
       const results = document.getElementById("results");
       const summary = document.getElementById("summary");
+      const failureAnalysis = document.getElementById("failure-analysis");
       const paths = document.getElementById("paths");
+      const versionBadge = document.getElementById("version-badge");
       const filledExcelLink = document.getElementById("filled-excel");
       const reportLink = document.getElementById("report-md");
       const openFolderButton = document.getElementById("open-folder");
@@ -386,7 +483,10 @@
 
       if (window.location.protocol === "file:") {
         runButton.disabled = true;
+        versionBadge.textContent = "Agent version: file mode";
         setStatus(fileModeMessage, "error");
+      } else {
+        loadServerVersion();
       }
 
       form.addEventListener("submit", async (event) => {
@@ -547,6 +647,7 @@
             return `<div class="metric"><span>${key}</span><strong>${value}</strong></div>`;
           })
           .join("");
+        renderFailureAnalysis(result.failureAnalysis);
 
         filledExcelLink.href = result.downloads.filledExcel;
         reportLink.href = result.downloads.reportMarkdown;
@@ -554,6 +655,8 @@
 
         paths.innerHTML = [
           `Inferred release: ${escapeHtml(result.release)}`,
+          `Agent version: ${escapeHtml(result.agentVersion || "unknown")}`,
+          `Execution readiness: ${escapeHtml(formatExecutionReadiness(result.executionReadiness))}`,
           `Filled Excel: ${escapeHtml(result.files.filledWorkbook)}`,
           `Report: ${escapeHtml(result.files.reportMarkdown)}`,
           `Result folder: ${escapeHtml(result.files.resultFolder)}`,
@@ -562,6 +665,38 @@
           .map((line) => `<div>${line}</div>`)
           .join("");
         results.classList.add("visible");
+      }
+
+      function formatExecutionReadiness(readiness) {
+        if (!readiness) return "not available";
+        return `${Number(readiness.ready || 0)} ready / ${Number(readiness.blocked || 0)} blocked / ${Number(readiness.manual_review || 0)} review`;
+      }
+
+      function renderFailureAnalysis(analysis) {
+        if (!analysis || !Array.isArray(analysis.clusters) || analysis.clusters.length === 0) {
+          failureAnalysis.classList.remove("visible");
+          failureAnalysis.innerHTML = "";
+          return;
+        }
+
+        const rows = analysis.clusters.slice(0, 5).map((cluster) => {
+          return `
+            <div class="failure-row">
+              <strong>${escapeHtml(cluster.label)}</strong>
+              <span class="failure-count">${Number(cluster.count || 0)}</span>
+              <p class="failure-action">${escapeHtml(cluster.recommended_next_action || "")}</p>
+            </div>
+          `;
+        });
+
+        failureAnalysis.innerHTML = `
+          <div class="failure-title">
+            <strong>Failure intelligence</strong>
+            <span>${Number(analysis.attention_case_count || 0)} cases need attention</span>
+          </div>
+          <div class="failure-list">${rows.join("")}</div>
+        `;
+        failureAnalysis.classList.add("visible");
       }
 
       function clearResult() {
@@ -573,6 +708,8 @@
         progressSummary.innerHTML = "";
         results.classList.remove("visible");
         summary.innerHTML = "";
+        failureAnalysis.classList.remove("visible");
+        failureAnalysis.innerHTML = "";
         paths.innerHTML = "";
         filledExcelLink.removeAttribute("href");
         reportLink.removeAttribute("href");
@@ -594,6 +731,19 @@
           return `Could not reach the local QA Agent server. Keep npm run qa:web running, then open ${localServerUrl}.`;
         }
         return message;
+      }
+
+      async function loadServerVersion() {
+        try {
+          const response = await fetch("/api/version");
+          const body = await response.json();
+          if (!response.ok) {
+            throw new Error(body.error || "Could not read QA Agent version.");
+          }
+          versionBadge.textContent = `Agent ${body.agentVersion || body.version || "unknown"}`;
+        } catch {
+          versionBadge.textContent = "Agent version: unknown";
+        }
       }
 
       function phaseLabel(phase) {

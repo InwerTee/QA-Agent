@@ -98,6 +98,15 @@ function inferActionStep(text: string): Omit<DynamicActionStep, "index" | "sourc
     };
   }
 
+  if (/\bnavigate\s+back\b|\bgo\s+back\b|\bback\s+to\b/i.test(normalized)) {
+    return {
+      action: "navigate",
+      target: "back",
+      reason: "The step asks the user to return to the previous page or list.",
+      confidence: "medium"
+    };
+  }
+
   if (/\bnavigate\s+to\b/i.test(normalized) && /\b(menu|page|section)\b/i.test(normalized)) {
     return {
       action: "navigate",
@@ -123,6 +132,17 @@ function inferActionStep(text: string): Omit<DynamicActionStep, "index" | "sourc
       target: filterSelection.target,
       value: filterSelection.value,
       reason: "The step describes a filter field and option value using field: option syntax.",
+      confidence: "medium"
+    };
+  }
+
+  const quotedSetSelection = inferQuotedSetSelection(normalized);
+  if (quotedSetSelection) {
+    return {
+      action: "select",
+      target: quotedSetSelection.target,
+      value: quotedSetSelection.value,
+      reason: "The step sets a quoted field to a quoted option value.",
       confidence: "medium"
     };
   }
@@ -217,6 +237,9 @@ function inferSelectionValue(text: string): string | undefined {
   const filterSelection = inferFilterSelection(text);
   if (filterSelection) return filterSelection.value;
 
+  const quotedSetSelection = inferQuotedSetSelection(text);
+  if (quotedSetSelection) return quotedSetSelection.value;
+
   const selectInMatch = text.match(/\b(?:selects?|chooses?|picks?)\s+(.+?)\s+in\s+the\s+.+?\bdropdown\b/i);
   if (selectInMatch?.[1]) return cleanupSelectionValue(selectInMatch[1]);
 
@@ -230,6 +253,21 @@ function inferSelectionValue(text: string): string | undefined {
   if (optionMatch?.[1]) return cleanupSelectionValue(optionMatch[1]);
 
   return undefined;
+}
+
+function inferQuotedSetSelection(text: string): { target: string; value: string } | undefined {
+  if (!/\bsets?\b/i.test(text)) return undefined;
+
+  const quoted = quotedTexts(text);
+  if (quoted.length < 2) return undefined;
+
+  const [target, value] = quoted;
+  if (!target || !value) return undefined;
+
+  return {
+    target: cleanupSelectionTarget(target),
+    value: cleanupSelectionValue(value)
+  };
 }
 
 function inferFilterSelection(text: string): { target: string; value: string } | undefined {

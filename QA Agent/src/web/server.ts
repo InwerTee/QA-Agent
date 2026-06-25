@@ -5,6 +5,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { AGENT_BUILD_LABEL, AGENT_VERSION } from "../runtime/agentVersion.js";
 import {
   runInputPackage,
   type RunPackageProgress,
@@ -39,8 +40,11 @@ interface JsonResponse {
   status: "done";
   runId: string;
   release: string;
+  agentVersion: string;
   selectedCases: string[];
   summary: RunPackageResult["report"]["summary"];
+  executionReadiness?: RunPackageResult["report"]["execution_readiness"];
+  failureAnalysis?: RunPackageResult["report"]["failure_analysis"];
   files: {
     filledWorkbook: string;
     reportMarkdown: string;
@@ -132,6 +136,14 @@ async function routeRequest(
 
   if (method === "GET" && url.pathname === "/health") {
     sendJson(response, 200, { ok: true });
+    return;
+  }
+
+  if (method === "GET" && url.pathname === "/api/version") {
+    sendJson(response, 200, {
+      agentVersion: AGENT_BUILD_LABEL,
+      version: AGENT_VERSION
+    });
     return;
   }
 
@@ -309,8 +321,11 @@ function buildRunResponse(result: RunPackageResult, record: WebRunRecord): JsonR
     status: "done",
     runId: record.runId,
     release: result.release,
+    agentVersion: result.report.agent_version,
     selectedCases: result.selectedCaseIds,
     summary: result.report.summary,
+    executionReadiness: result.report.execution_readiness,
+    failureAnalysis: result.report.failure_analysis,
     files: {
       filledWorkbook: record.filledWorkbookPath,
       reportMarkdown: record.reportMarkdownPath,

@@ -1,11 +1,19 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { missingSiteEnv, type RuntimeConfig } from "../runtime/config.js";
-import type { CaseResult, ExecutionMemory, NormalizedCase, QaStatus, RunReport, Site } from "../types.js";
+import { AGENT_BUILD_LABEL } from "../runtime/agentVersion.js";
+import type { CaseResult, ExecutionMemory, NormalizedCase, PrdKnowledgePack, QaStatus, RunReport, Site } from "../types.js";
+import { summarizePrdKnowledge } from "../knowledge/prdKnowledge.js";
 import { caseExecutionId } from "../core/runIdentity.js";
 import { formatMarkdownReport, summarize } from "../reporting/formatReport.js";
+import { analyzeRunFailures } from "../reporting/failureAnalysis.js";
 import { executeR6MasterCampaignCase } from "../executors/r6MasterCampaign.js";
 import { runDynamicCase } from "../dynamic/dynamicCaseRunner.js";
+import {
+  assessExecutionReadiness,
+  summarizeExecutionReadiness,
+  type ExecutionReadinessResult
+} from "../dynamic/executionReadiness.js";
 import { buildNotExecutedTrace } from "../traceability/caseTraceability.js";
 import {
   closeAdminPage,
@@ -35,6 +43,7 @@ export interface ProgressCase {
 export interface RunCasesOptions {
   onProgress?: (progress: RunCasesProgress) => void;
   caseTimeoutMs?: number;
+  prdKnowledge?: PrdKnowledgePack;
 }
 
 export async function runCases(
@@ -51,7 +60,10 @@ export async function runCases(
 
   const results: CaseResult[] = [];
   const memory: ExecutionMemory = {};
-  const sharedSessions = await openSharedSiteSessions(cases, config);
+  const readinessResults = await assessCasesForExecution(cases, config, options.prdKnowledge);
+  const readinessById = new Map(readinessResults.map((item) => [item.decision.case_id, item]));
+  const readyCases = cases.filter((testCase) => readinessById.get(testCase.stable_id)?.decision.can_execute);
+  const sharedSessions = await openSharedSiteSessions(readyCases, config);
   const emitProgress = (progress: Omit<RunCasesProgress, "runId" | "release" | "total" | "summary">) => {
     options.onProgress?.({
       runId,
@@ -65,7 +77,7 @@ export async function runCases(
   emitProgress({
     stage: "started",
     completed: 0,
-    message: `Starting ${cases.length} case(s).`
+    message: `Starting ${cases.length} case(s); ${readyCases.length} passed the conservative readiness gate.`
   });
 
   try {
@@ -85,7 +97,9 @@ export async function runCases(
         memory,
         sharedSessions,
         runId,
-        options.caseTimeoutMs ?? config.caseTimeoutMs
+        options.caseTimeoutMs ?? config.caseTimeoutMs,
+        options.prdKnowledge,
+        readinessById.get(testCase.stable_id)
       );
       results.push(result);
 
@@ -121,11 +135,15 @@ export async function runCases(
   const report: RunReport = {
     run_id: runId,
     release,
+    agent_version: AGENT_BUILD_LABEL,
     started_at: startedAt,
     finished_at: finishedAt,
     case_results: results,
+    prd_context: summarizePrdKnowledge(options.prdKnowledge),
+    execution_readiness: summarizeExecutionReadiness(readinessResults.map((item) => item.decision)),
     created_test_data: collectCreatedTestData(results),
-    summary: summarize(results)
+    summary: summarize(results),
+    failure_analysis: analyzeRunFailures(results)
   };
 
   const jsonPath = path.join(runDir, "report.json");
@@ -150,18 +168,20 @@ async function runSingleCaseWithTimeout(
   memory: ExecutionMemory,
   sharedSessions: SharedSiteSessions,
   runId: string,
-  timeoutMs: number
+  timeoutMs: number,
+  prdKnowledge?: PrdKnowledgePack,
+  readiness?: ExecutionReadinessResult
 ): Promise<{ result: CaseResult; timedOut: boolean }> {
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
     return {
-      result: await runSingleCase(testCase, config, runDir, memory, sharedSessions, runId),
+      result: await runSingleCase(testCase, config, runDir, memory, sharedSessions, runId, prdKnowledge, readiness),
       timedOut: false
     };
   }
 
   let timeout: NodeJS.Timeout | undefined;
   let timedOut = false;
-  const casePromise = runSingleCase(testCase, config, runDir, memory, sharedSessions, runId);
+  const casePromise = runSingleCase(testCase, config, runDir, memory, sharedSessions, runId, prdKnowledge, readiness);
   const timeoutPromise = new Promise<CaseResult>((resolve) => {
     timeout = setTimeout(() => {
       timedOut = true;
@@ -188,8 +208,14 @@ async function runSingleCase(
   runDir: string,
   memory: ExecutionMemory,
   sharedSessions: SharedSiteSessions,
-  runId: string
+  runId: string,
+  prdKnowledge?: PrdKnowledgePack,
+  readiness?: ExecutionReadinessResult
 ): Promise<CaseResult> {
+  if (readiness && !readiness.decision.can_execute) {
+    return readinessBlockedResult(testCase, readiness, runId);
+  }
+
   const missing = missingSiteEnv(config, testCase.site);
 
   if (missing.length > 0) {
@@ -230,8 +256,24 @@ async function runSingleCase(
 
   return runDynamicCase(testCase, config, runDir, runId, {
     adminSession: sharedSessions.sessions.admin,
-    siteSession: sharedSessions.sessions[testCase.site]
+    siteSession: sharedSessions.sessions[testCase.site],
+    prdKnowledge,
+    irBuild: readiness?.irBuild
   });
+}
+
+async function assessCasesForExecution(
+  cases: NormalizedCase[],
+  config: RuntimeConfig,
+  prdKnowledge?: PrdKnowledgePack
+): Promise<ExecutionReadinessResult[]> {
+  const results: ExecutionReadinessResult[] = [];
+
+  for (const testCase of cases) {
+    results.push(await assessExecutionReadiness(testCase, config, { prdKnowledge }));
+  }
+
+  return results;
 }
 
 interface SharedSiteSessions {
@@ -292,6 +334,45 @@ function sessionBlockedResult(
       status === "ENV_BLOCKED"
         ? "Treat this as environment/auth setup work, not a Gro product bug."
         : "Treat this as shared session setup work until browser startup is stable."
+    ]
+  };
+}
+
+function readinessBlockedResult(
+  testCase: NormalizedCase,
+  readiness: ExecutionReadinessResult,
+  runId: string
+): CaseResult {
+  const decision = readiness.decision;
+  const issueSummary = decision.issues
+    .filter((issue) => issue.severity === "blocker")
+    .map((issue) => issue.message);
+
+  return {
+    run_id: runId,
+    case_execution_id: caseExecutionId(runId, testCase.stable_id),
+    stable_id: testCase.stable_id,
+    title: testCase.title,
+    status: decision.recommended_status,
+    result_confidence: decision.confidence,
+    classification_reason: "Stopped by v0.20 conservative execution readiness gate.",
+    precondition_result: "Not checked because the case did not pass execution readiness.",
+    actual_result: `No browser actions were executed. ${decision.reason}`,
+    expected_result: testCase.expected_result,
+    failure_reason: issueSummary.join(" ") || decision.reason,
+    created_test_data: [],
+    depends_on_data: [],
+    traceability: buildNotExecutedTrace(
+      testCase,
+      `Conservative execution gate stopped this case before browser actions: ${decision.reason}`,
+      decision.test_case_ir
+    ),
+    execution_readiness: decision,
+    notes: [
+      ...decision.notes,
+      ...decision.issues.map((issue) =>
+        `${issue.severity.toUpperCase()}: ${issue.message}`
+      )
     ]
   };
 }

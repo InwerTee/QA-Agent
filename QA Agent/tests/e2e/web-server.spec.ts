@@ -12,6 +12,10 @@ test("local web runner page exposes the minimal upload workflow", async () => {
   expect(html).toContain("Run QA Agent");
   expect(html).toContain("Run label");
   expect(html).toContain("Run progress");
+  expect(html).toContain("version-badge");
+  expect(html).toContain("/api/version");
+  expect(html).toContain("Agent version");
+  expect(html).toContain("Execution readiness");
   expect(html).toContain("Running cases");
   expect(html).toContain("/api/run-status/");
   expect(html).toContain("Inferred release");

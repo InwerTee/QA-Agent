@@ -73,6 +73,7 @@ agent 会把它转换成:
 QA Agent/inputs/<release-or-run-id>/
   manifest.json
   cases.normalized.json
+  prd_knowledge.json
 ```
 
 ## 使用
@@ -168,7 +169,22 @@ reports/runs/<run-id>/result_mapping.json
 
 v0.9 增加了 General Gro Understanding Layer。每条 case 在执行前会被理解成结构化信息:目标 site、module、business object、action、precondition、expected assertion 和 required capability。Admin / Creator / Agency case 会按目标 site 使用对应本地配置和 storage state,再根据 module registry 尝试候选 route、菜单探索和通用动作执行。具体 case 仍可能因为缺少前置测试数据、有效邀请链接、验证码或更强断言能力而被标记为 blocked / manual review。
 
+v0.17 增加可选 LLM Test Case IR translator。默认不开启,agent 继续使用本地规则把 Paragon natural-language case 转成 Test Case IR。设置 `QA_LLM_ENABLED=true` 且提供 `OPENAI_API_KEY` 后,agent 会请求 OpenAI 生成候选 IR,再用本地 traceability validator 检查 `case_id`、`source_index`、`source_text` 和 step/expected 覆盖率。校验失败或 API 不可用时会自动回退到规则 IR,不会让模型自由生成 Playwright 脚本或直接判定 PASS。
+
+v0.18/v0.19 在不依赖 OpenAI API 的前提下让 PRD 进入 pipeline。`prepare` 会生成 `prd_knowledge.json`,从 PRD 文件名/文本、Excel case context 中保守提取 modules、pages、fields、actions 和 business rules。`run-package` 会把这份 knowledge pack 传给 triage 和 dynamic runner;case understanding 会用 PRD context 辅助判断目标 module、页面 label、字段和动作。Paragon test case 仍然是执行依据,PRD 只作为 disambiguation context。如果本机有 `pdftotext`,PDF PRD 会尝试抽取正文;否则使用文件名和测试用例上下文生成 partial knowledge。
+
 如果 `.env` 还没有配置 staging URL 和账号,`run` 会生成 `ENV_BLOCKED` 报告,不会假装执行成功。
+
+可选 LLM 翻译配置:
+
+```bash
+QA_LLM_ENABLED=true
+OPENAI_API_KEY=<your-local-key>
+QA_LLM_MODEL=gpt-5.2
+QA_LLM_TIMEOUT_MS=20000
+```
+
+LLM 只负责把测试用例翻译成结构化 Test Case IR。Playwright 执行仍然由本地 runner 控制,并且每个 IR node 必须回指原始 Excel 文本。
 
 ## Excel 结果回填
 

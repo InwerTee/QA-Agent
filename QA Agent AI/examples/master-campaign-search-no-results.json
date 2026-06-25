@@ -1,0 +1,19 @@
+{
+  "case_id": "R6-MC-SEARCH-NO-RESULTS",
+  "release": "R6",
+  "site": "admin",
+  "module": "Master Campaign",
+  "scenario": "Search Bar",
+  "title": "Search with No Results",
+  "precondition": "User is on the Master Campaign List Page. No master campaign name contains the term \"ZebraXylofon123\".",
+  "steps": [
+    "User focuses on the Search Bar.",
+    "User types \"ZebraXylofon123\" into the Search Bar.",
+    "User waits for the search to trigger (auto or presses Enter)."
+  ],
+  "expected_result": [
+    "The Master Campaign List Table updates to show no data rows.",
+    "An empty state message is shown, e.g., \"No results found matching your search.\"",
+    "The search keyword remains displayed so the user understands which term produced no results."
+  ]
+}

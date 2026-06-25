@@ -55,6 +55,7 @@ async function main(): Promise<void> {
     console.log(`Prepared ${result.caseCount} case(s) for ${result.release} - ${result.title}`);
     console.log(`Cases JSON: ${result.casesPath}`);
     console.log(`Manifest JSON: ${result.manifestPath}`);
+    console.log(`PRD knowledge JSON: ${result.prdKnowledgePath}`);
     console.log(`Ingestion report: ${result.reportPath}`);
     console.log(JSON.stringify(result.automationSummary, null, 2));
     return;

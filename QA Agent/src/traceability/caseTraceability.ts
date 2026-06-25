@@ -1,6 +1,7 @@
 import type {
   CaseExecutionTrace,
   NormalizedCase,
+  TestCaseIR,
   TraceCoverageStatus,
   TraceCoverageSummary,
   TraceEntry
@@ -56,7 +57,8 @@ export function buildTraceFromContract(
 
 export function buildNotExecutedTrace(
   testCase: NormalizedCase,
-  reason: string
+  reason: string,
+  testCaseIR?: TestCaseIR
 ): CaseExecutionTrace {
   const preconditionTrace = materializeTraceEntries(
     "precondition",
@@ -84,7 +86,8 @@ export function buildNotExecutedTrace(
     precondition_trace: preconditionTrace,
     step_trace: stepTrace,
     expected_trace: expectedTrace,
-    alignment_notes: [reason]
+    alignment_notes: [reason],
+    test_case_ir: testCaseIR
   });
 }
 
@@ -107,7 +110,12 @@ function buildCaseExecutionTrace(
   testCase: NormalizedCase,
   trace: Pick<
     CaseExecutionTrace,
-    "contract_id" | "precondition_trace" | "step_trace" | "expected_trace" | "alignment_notes"
+    | "contract_id"
+    | "precondition_trace"
+    | "step_trace"
+    | "expected_trace"
+    | "alignment_notes"
+    | "test_case_ir"
   >
 ): CaseExecutionTrace {
   const allEntries = [
@@ -129,7 +137,8 @@ function buildCaseExecutionTrace(
     step_trace: trace.step_trace,
     expected_trace: trace.expected_trace,
     coverage_summary: summarizeTraceCoverage(allEntries),
-    alignment_notes: trace.alignment_notes
+    alignment_notes: trace.alignment_notes,
+    test_case_ir: trace.test_case_ir
   };
 }
 

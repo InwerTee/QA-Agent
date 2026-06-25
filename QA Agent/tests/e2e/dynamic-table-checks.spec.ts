@@ -151,6 +151,27 @@ test("table filter checks stay partial when an applied filter has no visible tab
   );
 });
 
+test("table filter checks report no rows separately from uncheckable mappings", () => {
+  const check = checkTableRowsMatchFilters(
+    fakeObservation({
+      headers: ["User Name", "Platform", "Followers"],
+      rows: []
+    }),
+    [
+      { label: "Platform", kind: "one_of", values: ["TikTok"] },
+      { label: "Followers", kind: "range", min: 10_000, max: 50_000 }
+    ]
+  );
+
+  expect(check).toEqual(
+    expect.objectContaining({
+      status: "no_rows",
+      matchedFilters: ["Platform", "Followers"],
+      missingFilters: []
+    })
+  );
+});
+
 function fakeObservation(input: {
   headers?: string[];
   rows?: string[][];

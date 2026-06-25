@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { AGENT_BUILD_LABEL } from "../runtime/agentVersion.js";
 import { runtimeSiteConfig, type RuntimeConfig } from "../runtime/config.js";
 import type { NormalizedCase } from "../types.js";
 import type { CaseUnderstanding } from "../understanding/caseUnderstanding.js";
@@ -35,7 +36,7 @@ export async function discoverStartingPage(
 ): Promise<PageDiscoveryResult> {
   const baseUrl = runtimeSiteConfig(config, understanding.site).baseUrl?.replace(/\/$/, "");
   const notes = [
-    `v0.9 understanding: ${understanding.site}.${understanding.moduleKey}.${understanding.action}.`,
+    `${AGENT_BUILD_LABEL} understanding: ${understanding.site}.${understanding.moduleKey}.${understanding.action}.`,
     `Required capabilities: ${understanding.requiredCapabilities.join(", ")}.`
   ];
 
@@ -121,6 +122,14 @@ export function scorePageMatch(
     if (token.length > 2 && normalize(observation.url).includes(token)) {
       score += 1;
       reasons.push(`URL contains module token "${token}"`);
+    }
+  }
+
+  for (const label of [...understanding.routeHints.fieldLabels, ...understanding.routeHints.actionLabels].slice(0, 8)) {
+    const normalizedLabel = normalize(label);
+    if (normalizedLabel && haystack.includes(normalizedLabel)) {
+      score += 1;
+      reasons.push(`page contains PRD hint "${label}"`);
     }
   }
 

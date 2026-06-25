@@ -28,6 +28,10 @@ export interface RuntimeConfig {
   headless: boolean;
   evidenceDir: string;
   caseTimeoutMs: number;
+  llmEnabled: boolean;
+  openaiApiKey?: string;
+  llmModel: string;
+  llmTimeoutMs: number;
 }
 
 export function loadRuntimeConfig(): RuntimeConfig {
@@ -54,7 +58,11 @@ export function loadRuntimeConfig(): RuntimeConfig {
     storageTtlMs: Number(readEnv("QA_STORAGE_TTL_MS") ?? 24 * 60 * 60 * 1000),
     headless: readEnv("QA_HEADLESS") !== "false",
     evidenceDir: readEnv("QA_EVIDENCE_DIR") ?? "reports/runs",
-    caseTimeoutMs: Number(readEnv("QA_CASE_TIMEOUT_MS") ?? 90_000)
+    caseTimeoutMs: Number(readEnv("QA_CASE_TIMEOUT_MS") ?? 90_000),
+    llmEnabled: readBool("QA_LLM_ENABLED"),
+    openaiApiKey: readEnv("OPENAI_API_KEY"),
+    llmModel: readEnv("QA_LLM_MODEL") ?? "gpt-5.2",
+    llmTimeoutMs: Number(readEnv("QA_LLM_TIMEOUT_MS") ?? 20_000)
   };
 }
 

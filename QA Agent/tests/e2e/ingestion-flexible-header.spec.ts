@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
@@ -6,6 +6,7 @@ import { expect, test } from "@playwright/test";
 import { loadCasesFromFile } from "../../src/cases/loadCases.js";
 import { prepareInputPackage } from "../../src/ingestion/prepareInputPackage.js";
 import type { NormalizedCase } from "../../src/types.js";
+import type { PrdKnowledgePack } from "../../src/types.js";
 
 const require = createRequire(import.meta.url);
 const XlsxPopulate = require("xlsx-populate") as {
@@ -28,6 +29,7 @@ interface TestCell {
 test("ingestion supports Paragon two-row test steps headers", async () => {
   const tempDir = await mkdtemp(path.join(tmpdir(), "qa-flex-header-"));
   const workbookPath = path.join(tempDir, "R1.xlsx");
+  const prdPath = path.join(tempDir, "PRD - R1 Creator Database.txt");
   const outDir = path.join(tempDir, "out");
   const workbook = await XlsxPopulate.fromBlankAsync();
   const sheet = workbook.sheet("Sheet1");
@@ -66,9 +68,18 @@ test("ingestion supports Paragon two-row test steps headers", async () => {
   sheet.cell(11, 14).value("Known bug detail.");
 
   await workbook.toFileAsync(workbookPath);
+  await writeFile(
+    prdPath,
+    [
+      "R1 Revamp Creator Database.",
+      "Creator Account List Page includes Username, Phone Number, Status fields.",
+      "Admin can Search, Edit and View Detail from the list page."
+    ].join("\n")
+  );
 
   const prepared = await prepareInputPackage(tempDir, { outDir });
   const cases = JSON.parse(await readFile(prepared.casesPath, "utf8")) as NormalizedCase[];
+  const prdKnowledge = JSON.parse(await readFile(prepared.prdKnowledgePath, "utf8")) as PrdKnowledgePack;
 
   expect(prepared.release).toBe("R1");
   expect(cases).toHaveLength(1);
@@ -87,6 +98,12 @@ test("ingestion supports Paragon two-row test steps headers", async () => {
   expect(cases[0].source.historical_evidence).toBe("https://jam.dev/c/example");
   expect(cases[0].source.historical_status).toBe("PASSED");
   expect(cases[0].source.historical_note).toBe("Known bug detail.");
+  expect(prdKnowledge.modules.map((module) => module.key)).toContain("creator_account");
+  expect(prdKnowledge.pages.map((page) => page.name)).toContain("Creator Account List Page");
+  expect(prdKnowledge.fields.map((field) => field.name)).toEqual(
+    expect.arrayContaining(["Username", "Phone Number", "Status"])
+  );
+  expect(cases[0].prd_context?.matched_module_keys).toContain("creator_account");
 });
 
 test("ingestion supports scenario-grouped sheets without per-row case numbers", async () => {

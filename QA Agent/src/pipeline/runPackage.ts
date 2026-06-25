@@ -8,6 +8,7 @@ import {
   prepareInputPackage,
   type PrepareResult
 } from "../ingestion/prepareInputPackage.js";
+import { loadPrdKnowledgePack } from "../knowledge/prdKnowledge.js";
 import { loadRuntimeConfig } from "../runtime/config.js";
 import { runCases, type RunCasesProgress } from "../runner/runCases.js";
 import { triageRelease, type TriageResult } from "../triage/triageCases.js";
@@ -34,6 +35,7 @@ export interface RunPackageResult {
   inputDir: string;
   prepared: PrepareResult;
   triage: TriageResult;
+  prdKnowledgePath: string;
   selectedCaseIds: string[];
   processedCaseIds: string[];
   report: RunReport;
@@ -57,13 +59,17 @@ export async function runInputPackage(
     outDir: options.outDir
   });
   const cases = await loadCasesFromFile(prepared.casesPath);
+  const prdKnowledge = await loadPrdKnowledgePack(prepared.prdKnowledgePath);
 
   options.onProgress?.({
     phase: "triaging",
     release: prepared.release,
     message: `Triaging ${cases.length} parsed case(s).`
   });
-  const triage = await triageRelease(prepared.release, cases, { outDir: prepared.outDir });
+  const triage = await triageRelease(prepared.release, cases, {
+    outDir: prepared.outDir,
+    prdKnowledge
+  });
   const selectedCases = selectCasesForPackageRun(cases, options.caseIds, triage.automationMap);
 
   if (selectedCases.length === 0) {
@@ -79,6 +85,7 @@ export async function runInputPackage(
   });
   const runResult = await runCases(prepared.release, selectedCases, loadRuntimeConfig(), {
     caseTimeoutMs: options.caseTimeoutMs,
+    prdKnowledge,
     onProgress: (run) =>
       options.onProgress?.({
         phase: "running",
@@ -127,6 +134,7 @@ export async function runInputPackage(
     inputDir: path.resolve(inputDir),
     prepared,
     triage,
+    prdKnowledgePath: prepared.prdKnowledgePath,
     selectedCaseIds,
     processedCaseIds: selectedCaseIds,
     report: runResult.report,

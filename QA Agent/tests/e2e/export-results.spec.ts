@@ -61,6 +61,7 @@ test("export-results fills one Agent Result column in a copied workbook", async 
   const report: RunReport = {
     run_id: "R6-test-run",
     release: "R6",
+    agent_version: "v0.14.0",
     started_at: "2026-06-25T00:00:00.000Z",
     finished_at: "2026-06-25T00:00:10.000Z",
     case_results: [

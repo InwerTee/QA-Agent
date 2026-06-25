@@ -3,7 +3,7 @@ import {
   inferModuleNameFromText,
   understandCase
 } from "../../src/understanding/caseUnderstanding.js";
-import type { NormalizedCase } from "../../src/types.js";
+import type { NormalizedCase, PrdKnowledgePack } from "../../src/types.js";
 
 test("case understanding recognizes a new Lock Stock module without case-id routing", () => {
   const understanding = understandCase(
@@ -78,6 +78,29 @@ test("case understanding still detects explicit pagination", () => {
   expect(understanding.action).toBe("paginate");
 });
 
+test("case understanding uses PRD knowledge when the case text is ambiguous", () => {
+  const understanding = understandCase(
+    fakeCase({
+      title: "Verify successful edit",
+      scenario: "Edit record",
+      precondition: "User is on the list page.",
+      steps: ["Click Edit on a row.", "Change Phone Number.", "Click Save."],
+      expectedResult: ["Success message is shown and the row updates."],
+      module: "Unknown"
+    }),
+    fakePrdKnowledge()
+  );
+
+  expect(understanding.module).toBe("Creator Account");
+  expect(understanding.moduleKey).toBe("creator_account");
+  expect(understanding.moduleConfidence).toBe("high");
+  expect(understanding.routeHints.moduleLabels).toEqual(
+    expect.arrayContaining(["Creator Account", "Creator Account List Page"])
+  );
+  expect(understanding.routeHints.fieldLabels).toContain("Phone Number");
+  expect(understanding.evidence.join("\n")).toContain("PRD module context");
+});
+
 test("module inference covers common Gro business objects", () => {
   expect(inferModuleNameFromText("Bind Shopee account")).toBe("Shopee Binding");
   expect(inferModuleNameFromText("Submit KR Request")).toBe("KR Request");
@@ -96,6 +119,7 @@ function fakeCase(input: {
   steps: string[];
   expectedResult: string[];
   site?: NormalizedCase["site"];
+  module?: string;
 }): NormalizedCase {
   return {
     stable_id: "GEN-B1-TC01",
@@ -107,7 +131,7 @@ function fakeCase(input: {
     scenario: input.scenario,
     title: input.title,
     site: input.site ?? "admin",
-    module: "Unknown",
+    module: input.module ?? "Unknown",
     type: "Positive",
     intent: `Verify ${input.title}.`,
     precondition: input.precondition,
@@ -126,5 +150,68 @@ function fakeCase(input: {
       expected_result: input.expectedResult.join("\n"),
       type: "Positive"
     }
+  };
+}
+
+function fakePrdKnowledge(): PrdKnowledgePack {
+  return {
+    version: "prd_knowledge.v1",
+    release: "R1",
+    title: "R1 Revamp Creator Database",
+    generated_at: "2026-06-25T00:00:00.000Z",
+    source_path: "PRD - R1.txt",
+    extraction: {
+      status: "available",
+      method: "text_file",
+      character_count: 200,
+      notes: []
+    },
+    modules: [
+      {
+        name: "Creator Account",
+        key: "creator_account",
+        aliases: ["Creator Database", "All Creators"],
+        sites: ["admin"],
+        evidence: ["Found Creator Account."]
+      }
+    ],
+    pages: [
+      {
+        name: "Creator Account List Page",
+        module_key: "creator_account",
+        aliases: ["Creator Account List", "List Page"],
+        site: "admin",
+        candidate_routes: [],
+        evidence: ["Detected page-like phrase."]
+      }
+    ],
+    fields: [
+      {
+        name: "Phone Number",
+        module_key: "creator_account",
+        page_name: "Creator Account List Page",
+        aliases: ["Phone Number"],
+        evidence: ["Detected field."]
+      }
+    ],
+    actions: [
+      {
+        name: "Edit",
+        kind: "edit",
+        module_key: "creator_account",
+        page_name: "Creator Account List Page",
+        evidence: ["Detected action."]
+      }
+    ],
+    business_rules: [],
+    glossary: [],
+    case_alignment: {
+      case_count: 1,
+      module_case_counts: {
+        creator_account: 1
+      },
+      unmatched_case_count: 0
+    },
+    notes: []
   };
 }

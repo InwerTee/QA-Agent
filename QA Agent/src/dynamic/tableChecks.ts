@@ -45,7 +45,7 @@ export interface TableFilterAssertionCheck {
   matchedFilters: string[];
   missingFilters: string[];
   offendingRows: string[];
-  status: "passed" | "failed" | "partial" | "not_checkable";
+  status: "passed" | "failed" | "partial" | "no_rows" | "not_checkable";
   actual: string;
 }
 
@@ -203,7 +203,7 @@ export function checkTableRowsMatchFilters(
       matchedFilters: tableMatch.matched.map((match) => match.filter.label),
       missingFilters: tableMatch.missing.map((filter) => filter.label),
       offendingRows: [],
-      status: "not_checkable",
+      status: "no_rows",
       actual: "No sampled table rows were available after applying filters, so row-level filter correctness could not be verified."
     };
   }
