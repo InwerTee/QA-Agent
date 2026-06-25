@@ -3,13 +3,12 @@
 这个根目录现在分成两块:
 
 - `QA Agent/`: QA Agent 的实际代码、输入样例、runner、报告生成器和 Playwright 测试。
-- `参考文档/`: PRD、Paragon 测试用例、产品构思、项目背景和历史参考资料。
 
-开发新版 Agent 时,进入 `QA Agent/` 运行命令:
+日常使用时,进入 `QA Agent/` 启动本地前端:
 
 ```bash
 cd "QA Agent"
-npm run qa:list:r6
-npm run qa:plan:r6
-npm run qa:run:r6
+npm run qa:web
 ```
+
+然后打开 `http://127.0.0.1:4173`,上传本次 release 的 PRD 和 Paragon 测试用例 Excel,点击 Run 后等待结果即可。
