@@ -1,6 +1,6 @@
 {
   "name": "gro-qa-agent",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,6 +9,7 @@
     "preqa": "npm run build --silent",
     "qa": "node dist/src/cli.js",
     "qa:prepare:r6": "npm run qa -- prepare input-packages/R6-sample --release R6 --out inputs/R6",
+    "qa:triage:r6": "npm run qa -- triage R6 --out inputs/R6",
     "qa:list:r6": "npm run qa -- list R6",
     "qa:plan:r6": "npm run qa -- plan R6 --case R6-B7.2-TC01 --case R6-B7.1-TC01",
     "qa:run:r6": "npm run qa -- run R6 --case R6-B7.2-TC01 --case R6-B7.1-TC01",

@@ -25,6 +25,8 @@ agent 负责:
 
 当前 R6 MVP 已经补上了第一个 `prepare` 阶段:它能从本地 R6 input package 读取 PRD + test case Excel,生成 `inputs/R6/cases.normalized.json`。执行层目前仍只接了两条 R6 pilot case,其他 case 会先被标记为 `needs_mapping` 或 `manual_review`。
 
+v0.3 在 `prepare` 之后增加了 `triage` 阶段和 traceability guard:它不跑浏览器,而是把 normalized cases 分成主流程、下一批自动化候选、需要 fixture/control 的 case、以及建议人工复核的 case;同时要求 normalized case 保留 Excel 原文和 source row,已经实现 executor 的 case 必须声明 traceability contract,把原始 test steps / expected results 映射到自动化动作和断言。未覆盖或部分覆盖的 expected result 必须显式标记,不能因为脚本跑通就自动当作完整通过原 case。
+
 ## 正式输入
 
 建议未来每次运行输入一个 input package:
@@ -50,6 +52,7 @@ input-packages/<release-or-run-id>/
 
 ```bash
 npm run qa -- prepare ./input-packages/R6-sample --release R6 --out ./inputs/R6
+npm run qa -- triage R6 --out ./inputs/R6
 npm run qa -- run R6 --case R6-B7.2-TC01 --case R6-B7.1-TC01
 ```
 
@@ -62,6 +65,8 @@ inputs/<release-or-run-id>/
   manifest.json
   cases.normalized.json
   ingestion_report.md
+  automation_map.json
+  triage_report.md
 ```
 
 `cases.normalized.json` 是执行层真正读取的输入。这样做的原因:
@@ -78,6 +83,8 @@ inputs/<release-or-run-id>/
 prd.pdf + test-cases.xlsx
         ↓ prepare
 manifest.json / cases.normalized.json / ingestion_report.md
+        ↓ triage
+automation_map.json / triage_report.md
         ↓ run
 report.json / report.md / evidence
 ```
@@ -98,6 +105,8 @@ reports/runs/<run-id>/
 - case status
 - actual result
 - expected result
+- source workbook / sheet / row
+- assertion trace from original expected result to automated check
 - failure reason
 - evidence path
 - created test data

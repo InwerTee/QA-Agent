@@ -56,5 +56,9 @@ function validateCase(testCase: NormalizedCase): NormalizedCase {
     throw new Error(`Invalid case ${testCase.stable_id}: missing expected_result`);
   }
 
+  if (!testCase.raw_source || typeof testCase.raw_source.test_case !== "string") {
+    throw new Error(`Invalid case ${testCase.stable_id}: missing raw_source traceability`);
+  }
+
   return testCase;
 }

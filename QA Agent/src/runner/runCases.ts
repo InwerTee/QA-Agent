@@ -4,6 +4,7 @@ import { missingAdminEnv, type RuntimeConfig } from "../runtime/config.js";
 import type { CaseResult, ExecutionMemory, NormalizedCase, RunReport } from "../types.js";
 import { formatMarkdownReport, summarize } from "../reporting/formatReport.js";
 import { executeR6MasterCampaignCase } from "../executors/r6MasterCampaign.js";
+import { buildNotExecutedTrace } from "../traceability/caseTraceability.js";
 
 export async function runCases(
   release: string,
@@ -62,6 +63,10 @@ async function runSingleCase(
         failure_reason: `Missing required environment variable(s): ${missing.join(", ")}.`,
         created_test_data: [],
         depends_on_data: [],
+        traceability: buildNotExecutedTrace(
+          testCase,
+          "Environment/authentication configuration blocked execution before browser actions."
+        ),
         notes: [
           "Fill .env from .env.example before running browser execution.",
           "This is an environment/setup block, not a product bug."
@@ -85,6 +90,10 @@ async function runSingleCase(
     failure_reason: `Missing case executor for ${testCase.stable_id}.`,
     created_test_data: [],
     depends_on_data: [],
+    traceability: buildNotExecutedTrace(
+      testCase,
+      `No Playwright executor has been implemented for ${testCase.stable_id}.`
+    ),
     notes: [
       "Next step: implement selectors and browser actions for this stable case id.",
       "Do not mark this as a Gro product bug."

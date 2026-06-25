@@ -85,6 +85,15 @@ export function formatMarkdownReport(report: RunReport): string {
       lines.push(`- Evidence: ${result.evidence_path}`);
     }
 
+    lines.push(`- Source workbook: ${result.traceability.source_workbook}`);
+    lines.push(`- Source sheet/row: ${result.traceability.source_sheet} / ${result.traceability.source_row}`);
+    if (result.traceability.contract_id) {
+      lines.push(`- Trace contract: ${result.traceability.contract_id}`);
+    }
+    lines.push(
+      `- Trace coverage: covered ${result.traceability.coverage_summary.covered}, partial ${result.traceability.coverage_summary.partially_covered}, not covered ${result.traceability.coverage_summary.not_covered}, not executed ${result.traceability.coverage_summary.not_executed}`
+    );
+
     if (result.created_test_data.length > 0) {
       lines.push("");
       lines.push("Created test data:");
@@ -115,6 +124,32 @@ export function formatMarkdownReport(report: RunReport): string {
     lines.push("Expected result:");
     for (const expected of result.expected_result) {
       lines.push(`- ${expected}`);
+    }
+
+    lines.push("");
+    lines.push("Traceability - Expected Results:");
+    lines.push("");
+    lines.push("| # | Coverage | Original Expected Text | Automated Check | Notes |");
+    lines.push("| ---: | --- | --- | --- | --- |");
+    for (const entry of result.traceability.expected_trace) {
+      lines.push(
+        `| ${entry.source_index} | ${entry.coverage} | ${oneLine(entry.source_text)} | ${oneLine(
+          entry.actual_check
+        )} | ${oneLine(entry.notes.join("; "))} |`
+      );
+    }
+
+    lines.push("");
+    lines.push("Traceability - Test Steps:");
+    lines.push("");
+    lines.push("| # | Coverage | Original Step Text | Automated Action | Notes |");
+    lines.push("| ---: | --- | --- | --- | --- |");
+    for (const entry of result.traceability.step_trace) {
+      lines.push(
+        `| ${entry.source_index} | ${entry.coverage} | ${oneLine(entry.source_text)} | ${oneLine(
+          entry.actual_check
+        )} | ${oneLine(entry.notes.join("; "))} |`
+      );
     }
   }
 

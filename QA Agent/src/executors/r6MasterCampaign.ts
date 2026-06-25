@@ -11,6 +11,8 @@ import type {
 } from "../types.js";
 import { closeAdminPage, openAdminPage, QaBlockedError } from "../playwright/adminSession.js";
 import { fillTinyMCE, pickDateRange, pickFirstElOption, visibleText } from "../playwright/groUi.js";
+import { buildNotExecutedTrace } from "../traceability/caseTraceability.js";
+import { buildR6ExecutionTrace } from "../traceability/r6TraceContracts.js";
 
 export async function executeR6MasterCampaignCase(
   testCase: NormalizedCase,
@@ -85,6 +87,7 @@ async function createMasterCampaign(
       evidence_path: evidencePath,
       created_test_data: [createdData],
       depends_on_data: [],
+      traceability: buildR6ExecutionTrace(testCase, evidencePath),
       notes: ["Executed with selectors and UI idioms from a previously verified Gro UI flow."]
     };
   } catch (error) {
@@ -135,6 +138,7 @@ async function searchMasterCampaign(
         failure_reason: "Search result table did not display only matching Master Campaign names.",
         created_test_data: [],
         depends_on_data: dataDependency,
+        traceability: buildR6ExecutionTrace(testCase, evidencePath),
         notes: [
           "This is now validated against visible table rows, not just the search input text.",
           "If the product search is intentionally broad across other fields, this case needs manual review or expected-result clarification."
@@ -154,6 +158,7 @@ async function searchMasterCampaign(
       evidence_path: evidencePath,
       created_test_data: [],
       depends_on_data: dataDependency,
+      traceability: buildR6ExecutionTrace(testCase, evidencePath),
       notes: memory.createdMasterCampaign
         ? ["Search case used the previous create case as setup data."]
         : ["No created campaign was available in memory, so the original precondition data was used."]
@@ -251,6 +256,7 @@ function toBlockedResult(
     failure_reason: message,
     created_test_data: [],
     depends_on_data: [],
+    traceability: buildNotExecutedTrace(testCase, message),
     notes: [
       status === "ENV_BLOCKED"
         ? "Treat this as environment/auth setup work, not a Gro product bug."

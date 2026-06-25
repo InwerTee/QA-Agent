@@ -35,12 +35,15 @@ inputs/R6/
   manifest.json             # R6 input package 的输入来源说明
   cases.normalized.json     # 从 R6 workbook 生成的标准化 test cases
   ingestion_report.md       # 本次解析摘要和自动化状态分布
+  automation_map.json       # v0.3 自动化分层和 executor bucket
+  triage_report.md          # v0.3 人可读自动化路线图
 
 src/
   cli.ts                    # 命令入口
   cases/                    # case 读取与过滤
   core/                     # setup plan 与判断类型
   ingestion/                # PRD / Excel 输入包解析
+  triage/                   # case 自动化优先级和 executor 归类
   runner/                   # 执行调度
   reporting/                # JSON/Markdown 报告
   runtime/                  # env/runtime config
@@ -74,12 +77,32 @@ QA Agent/inputs/<release-or-run-id>/
 
 ```bash
 npm run qa:prepare:r6
+npm run qa:triage:r6
 npm run qa:list:r6
 npm run qa:plan:r6
 npm run qa:run:r6
 ```
 
 `qa:prepare:r6` 会从本地 `input-packages/R6-sample/` 读取 R6 PRD 和 Excel,生成 `inputs/R6/manifest.json`、`inputs/R6/cases.normalized.json` 和 `inputs/R6/ingestion_report.md`。`input-packages/` 是本地运行输入,不会进 git。
+
+`qa:triage:r6` 会读取 `inputs/R6/cases.normalized.json`,生成 `inputs/R6/automation_map.json` 和 `inputs/R6/triage_report.md`。它不会跑浏览器,只负责判断:
+
+- 哪些 case 已经有 executor。
+- 哪些 case 是下一批可自动化候选。
+- 哪些 case 需要先准备 deterministic fixture / API setup / backend control。
+- 哪些 case 更适合人工复核或先明确 evidence 策略。
+
+## Traceability Guard
+
+为了防止 agent 偏离 Paragon 原测试用例,`prepare` 会在每条 normalized case 中保留 Excel 原文:
+
+- `raw_source.test_case`
+- `raw_source.pre_requisite`
+- `raw_source.test_steps`
+- `raw_source.expected_result`
+- `source.workbook` / `sheet` / `source_row`
+
+已经实现 executor 的 case 还必须有 traceability contract,声明每条原始 step / expected result 被哪个自动化动作或断言覆盖。当前 R6 两条已实现 case 都有 contract;其中 `R6-B7.2-TC01` 被明确标记为 smoke-level partial coverage,不会被误认为完整覆盖了原 case 的所有 expected result。
 
 如果 `.env` 还没有配置 staging URL 和账号,`run` 会生成 `ENV_BLOCKED` 报告,不会假装执行成功。
 

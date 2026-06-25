@@ -191,6 +191,9 @@ function parseCases(
     const stableId = `${release}-${currentGroupCode}-TC${String(caseNo).padStart(2, "0")}`;
     const scenario = cellToString(row[workbook.headerMap.scenario]);
     const precondition = normalizeText(cellToString(row[workbook.headerMap.precondition]));
+    const rawPrecondition = cellToString(row[workbook.headerMap.precondition]);
+    const rawSteps = cellToString(row[workbook.headerMap.steps]);
+    const rawExpected = cellToString(row[workbook.headerMap.expected]);
     const steps = splitList(cellToString(row[workbook.headerMap.steps]));
     const expectedResult = splitList(cellToString(row[workbook.headerMap.expected]));
     const rawType = cellToString(row[workbook.headerMap.type]);
@@ -220,6 +223,17 @@ function parseCases(
         historical_status: getOptionalCell(row, workbook.headerMap.status),
         historical_evidence: getOptionalCell(row, workbook.headerMap.evidence),
         historical_note: sourceNote || undefined
+      },
+      raw_source: {
+        scenario,
+        test_case: title,
+        pre_requisite: rawPrecondition,
+        test_steps: rawSteps,
+        expected_result: rawExpected,
+        type: rawType,
+        status: getOptionalCell(row, workbook.headerMap.status),
+        evidence: getOptionalCell(row, workbook.headerMap.evidence),
+        note: sourceNote || undefined
       }
     });
   }

@@ -3,13 +3,20 @@ import { buildSetupPlan } from "./core/setupPlan.js";
 import { prepareInputPackage } from "./ingestion/prepareInputPackage.js";
 import { loadRuntimeConfig } from "./runtime/config.js";
 import { runCases } from "./runner/runCases.js";
+import { triageRelease } from "./triage/triageCases.js";
 
-type ParsedArgs = PrepareArgs | CaseCommandArgs;
+type ParsedArgs = PrepareArgs | TriageArgs | CaseCommandArgs;
 
 interface PrepareArgs {
   command: "prepare";
   inputDir: string;
   release?: string;
+  outDir?: string;
+}
+
+interface TriageArgs {
+  command: "triage";
+  release: string;
   outDir?: string;
 }
 
@@ -36,6 +43,16 @@ async function main(): Promise<void> {
   }
 
   const allCases = await loadCases(args.release);
+
+  if (args.command === "triage") {
+    const result = await triageRelease(args.release, allCases, { outDir: args.outDir });
+    console.log(`Triaged ${result.automationMap.total_cases} case(s) for ${result.release}`);
+    console.log(`Automation map: ${result.automationMapPath}`);
+    console.log(`Triage report: ${result.reportPath}`);
+    console.log(JSON.stringify(result.automationMap.summary, null, 2));
+    return;
+  }
+
   const selectedCases = filterCases(allCases, args.caseIds);
 
   if (args.command === "list") {
@@ -71,8 +88,12 @@ function parseArgs(argv: string[]): ParsedArgs {
 
   if (!command || !release) {
     throw new Error(
-      "Usage: npm run qa -- <prepare|list|plan|run> ..."
+      "Usage: npm run qa -- <prepare|triage|list|plan|run> ..."
     );
+  }
+
+  if (command === "triage") {
+    return parseTriageArgs(release, rest);
   }
 
   if (command !== "list" && command !== "plan" && command !== "run") {
@@ -98,6 +119,28 @@ function parseArgs(argv: string[]): ParsedArgs {
   }
 
   return { command, release, caseIds };
+}
+
+function parseTriageArgs(release: string | undefined, rest: string[]): TriageArgs {
+  if (!release) {
+    throw new Error("Usage: npm run qa -- triage <RELEASE> [--out <OUTPUT_DIR>]");
+  }
+
+  let outDir: string | undefined;
+
+  for (let index = 0; index < rest.length; index += 1) {
+    const token = rest[index];
+
+    if (token === "--out") {
+      outDir = readNextArg(rest, index, "--out");
+      index += 1;
+      continue;
+    }
+
+    throw new Error(`Unknown argument: ${token}`);
+  }
+
+  return { command: "triage", release, outDir };
 }
 
 function parsePrepareArgs(inputDir: string | undefined, rest: string[]): PrepareArgs {
