@@ -1,4 +1,4 @@
-# Gro QA Agent AI
+# Gro QA Agent AI v0.1
 
 Experimental branch for a more agentic QA runner.
 
