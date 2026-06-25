@@ -22,9 +22,10 @@ test("R6 triage identifies main flow and next automation candidates", async () =
     "R6-B7.4-TC03",
     "R6-B7.5-TC01"
   ]);
-  expect(result.automationMap.summary.by_readiness.implemented).toBe(2);
-  expect(result.automationMap.next_candidate_ids[0]).toBe("R6-B7.3-TC01");
-  expect(triageById.get("R6-B7.3-TC01")?.readiness).toBe("candidate");
+  expect(result.automationMap.summary.by_readiness.implemented).toBe(3);
+  expect(result.automationMap.next_candidate_ids[0]).toBe("R6-B7.4-TC03");
+  expect(triageById.get("R6-B7.3-TC01")?.readiness).toBe("implemented");
+  expect(triageById.get("R6-B7.3-TC01")?.traceability.has_executor_contract).toBe(true);
   expect(triageById.get("R6-B7.5-TC01")?.executor_key).toBe(
     "master_campaign.detail.dashboard"
   );

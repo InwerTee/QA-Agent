@@ -396,6 +396,10 @@ function inferAutomationStatus(
     return "ready";
   }
 
+  if (stableId === "R6-B7.3-TC01") {
+    return "ready";
+  }
+
   const text = `${precondition} ${steps.join(" ")} ${expectedResult.join(" ")}`;
   if (/cross-check|backend|network issue|external|new browser tab|export/i.test(text)) {
     return "manual_review";

@@ -23,9 +23,11 @@ agent 负责:
 6. 对比 actual result 和 expected result。
 7. 输出报告、evidence 和测试数据 lineage。
 
-当前 R6 MVP 已经补上了第一个 `prepare` 阶段:它能从本地 R6 input package 读取 PRD + test case Excel,生成 `inputs/R6/cases.normalized.json`。执行层目前仍只接了两条 R6 pilot case,其他 case 会先被标记为 `needs_mapping` 或 `manual_review`。
+当前 R6 MVP 已经补上了第一个 `prepare` 阶段:它能从本地 R6 input package 读取 PRD + test case Excel,生成 `inputs/R6/cases.normalized.json`。执行层目前接了三条 R6 pilot case,其他 case 会先被标记为 `needs_mapping` 或 `manual_review`。
 
 v0.3 在 `prepare` 之后增加了 `triage` 阶段和 traceability guard:它不跑浏览器,而是把 normalized cases 分成主流程、下一批自动化候选、需要 fixture/control 的 case、以及建议人工复核的 case;同时要求 normalized case 保留 Excel 原文和 source row,已经实现 executor 的 case 必须声明 traceability contract,把原始 test steps / expected results 映射到自动化动作和断言。未覆盖或部分覆盖的 expected result 必须显式标记,不能因为脚本跑通就自动当作完整通过原 case。
+
+v0.4 把 R6 主流程从 `create -> search` 扩展到 `create -> search -> edit basic information`,新增 `R6-B7.3-TC01` executor。同一轮 run 会共享一个 Admin browser session,减少重复浏览器启动和登录上下文初始化。B7.3 仍是 partial coverage:会从列表 Operation column 进入 Edit 弹窗并验证 Basic Information 的 Brief Description 更新,但 target invariance 和 Updated Date 刷新仍需后续补断言。
 
 ## 正式输入
 
@@ -53,7 +55,7 @@ input-packages/<release-or-run-id>/
 ```bash
 npm run qa -- prepare ./input-packages/R6-sample --release R6 --out ./inputs/R6
 npm run qa -- triage R6 --out ./inputs/R6
-npm run qa -- run R6 --case R6-B7.2-TC01 --case R6-B7.1-TC01
+npm run qa -- run R6 --case R6-B7.2-TC01 --case R6-B7.1-TC01 --case R6-B7.3-TC01
 ```
 
 ## 中间输入

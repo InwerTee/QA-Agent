@@ -135,6 +135,101 @@ const CONTRACTS: Record<string, CaseTraceContract> = {
       "Executor directly follows the original Master Campaign list search case.",
       "If product search intentionally matches other fields, expected result should be clarified in the source case."
     ]
+  },
+  "R6-B7.3-TC01": {
+    contract_id: "R6-B7.3-TC01.master_campaign.edit_basic_info.v1",
+    precondition_trace: [
+      {
+        source_index: 1,
+        coverage: "covered",
+        actual_check:
+          "Uses the Master Campaign created by R6-B7.2-TC01, searches it from the list, and opens the Edit Master Campaign dialog through the row Operation column."
+      }
+    ],
+    step_trace: [
+      {
+        source_index: 1,
+        coverage: "partially_covered",
+        actual_check:
+          "Clicked the target row's Edit action from the Master Campaign list Operation column; the current Gro UI did not expose an Edit Master Campaign button on the detail page.",
+        notes: [
+          "This reaches the same Edit Master Campaign dialog, but the UI entry point differs from the original source wording."
+        ]
+      },
+      {
+        source_index: 2,
+        coverage: "partially_covered",
+        actual_check:
+          "Waited for the Edit Master Campaign dialog and interacted with pre-filled fields; the script does not yet assert every pre-filled target field value.",
+        notes: ["Add field-by-field prefill assertions before claiming full step coverage."]
+      },
+      {
+        source_index: 3,
+        coverage: "covered",
+        actual_check:
+          "Updated only the Brief Description rich text in the Basic Information section."
+      },
+      {
+        source_index: 4,
+        coverage: "covered",
+        actual_check:
+          "The executor does not write to target fields during the edit flow."
+      },
+      {
+        source_index: 5,
+        coverage: "partially_covered",
+        actual_check:
+          "Clicked Update successfully; the script does not separately assert the Update button enabled state before clicking.",
+        notes: ["Add explicit enabled-state assertion if this becomes a strict UI requirement."]
+      },
+      {
+        source_index: 6,
+        coverage: "covered",
+        actual_check: "Clicked Update and waited for the edit dialog to close."
+      }
+    ],
+    expected_trace: [
+      {
+        source_index: 1,
+        coverage: "covered",
+        actual_check:
+          "Verified the updated Brief Description appears on the Master Campaign detail page after saving."
+      },
+      {
+        source_index: 2,
+        coverage: "partially_covered",
+        actual_check:
+          "Waited for the edit dialog to close, then opened the Master Campaign detail page to verify the saved Basic Information.",
+        notes: [
+          "Because the current edit entry point is the list Operation column, returning to detail is performed by the executor after save rather than observed as an automatic product navigation."
+        ]
+      },
+      {
+        source_index: 3,
+        coverage: "covered",
+        actual_check:
+          "Verified the detail page shows the new Brief Description text."
+      },
+      {
+        source_index: 4,
+        coverage: "not_covered",
+        actual_check:
+          "The current executor does not snapshot Dashboard Overview or Pillar Contribution target values before and after edit.",
+        notes: ["Target-value invariance needs dedicated dashboard assertions or API-backed comparison."]
+      },
+      {
+        source_index: 5,
+        coverage: "not_covered",
+        actual_check:
+          "The current executor does not verify Updated Date / Update Information refresh.",
+        notes: ["Updated timestamp checks should be added once the detail/list date fields are reliably located."]
+      }
+    ],
+    alignment_notes: [
+      "Executor follows the original Edit Basic Information happy path and limits edits to non-target Basic Information.",
+      "Current Gro UI exposes the edit entry point from the Master Campaign list Operation column; this differs from the source case wording that mentions the detail page.",
+      "Do not treat R6-B7.3-TC01 as fully covered until target invariance and updated timestamp assertions are implemented."
+    ]
   }
 };
 

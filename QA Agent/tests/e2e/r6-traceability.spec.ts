@@ -25,7 +25,8 @@ test("implemented R6 executors must declare traceability contracts", async () =>
 
   expect(implementedCases.map((testCase) => testCase.stable_id).sort()).toEqual([
     "R6-B7.1-TC01",
-    "R6-B7.2-TC01"
+    "R6-B7.2-TC01",
+    "R6-B7.3-TC01"
   ]);
 
   for (const testCase of implementedCases) {
@@ -36,6 +37,23 @@ test("implemented R6 executors must declare traceability contracts", async () =>
     expect(trace.step_trace).toHaveLength(testCase.steps.length);
     expect(trace.expected_trace).toHaveLength(testCase.expected_result.length);
   }
+});
+
+test("R6 edit basic info executor is traceable but does not over-claim target/date coverage", async () => {
+  const cases = await loadCases("R6");
+  const editCase = cases.find((testCase) => testCase.stable_id === "R6-B7.3-TC01");
+
+  expect(editCase).toBeDefined();
+  const trace = buildR6ExecutionTrace(editCase!, "evidence.png");
+
+  expect(trace.raw_test_case).toBe("Edit Basic Information Only");
+  expect(trace.coverage_summary.not_covered).toBeGreaterThan(0);
+  expect(trace.expected_trace.find((entry) => entry.source_index === 4)?.coverage).toBe(
+    "not_covered"
+  );
+  expect(trace.expected_trace.find((entry) => entry.source_index === 5)?.coverage).toBe(
+    "not_covered"
+  );
 });
 
 test("R6 create smoke executor is traceable but not over-claimed as full coverage", async () => {

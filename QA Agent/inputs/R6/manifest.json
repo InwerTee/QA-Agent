@@ -1,7 +1,7 @@
 {
   "release": "R6",
   "title": "Master Campaign",
-  "generated_at": "2026-06-25T06:21:06.266Z",
+  "generated_at": "2026-06-25T07:21:03.531Z",
   "input_package": "input-packages/R6-sample",
   "prd": {
     "path": "input-packages/R6-sample/PRD - R6 Master Campaign.pdf",
@@ -16,14 +16,15 @@
     "cases": 53,
     "scenario_groups": 5,
     "automation": {
-      "ready": 2,
-      "needs_mapping": 48,
+      "ready": 3,
+      "needs_mapping": 47,
       "manual_review": 3
     }
   },
   "ready_case_ids": [
     "R6-B7.1-TC01",
-    "R6-B7.2-TC01"
+    "R6-B7.2-TC01",
+    "R6-B7.3-TC01"
   ],
   "notes": [
     "Generated from a local input package; do not modify the original PRD or workbook.",

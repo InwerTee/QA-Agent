@@ -13,8 +13,8 @@
 - Release: R6
 - Title: Master Campaign
 - Normalized cases: 53
-- Ready for current executor: 2
-- Needs executor / selector mapping: 48
+- Ready for current executor: 3
+- Needs executor / selector mapping: 47
 - Manual review suggested: 3
 
 ## Scenario Groups
@@ -29,6 +29,7 @@
 
 - R6-B7.1-TC01 - Search by Master Campaign Name (Success)
 - R6-B7.2-TC01 - Create Master Campaign with All Fields
+- R6-B7.3-TC01 - Edit Basic Information Only
 
 ## Notes
 

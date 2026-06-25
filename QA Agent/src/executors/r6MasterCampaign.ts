@@ -9,7 +9,12 @@ import type {
   TestDataRecord,
   TestDataReference
 } from "../types.js";
-import { closeAdminPage, openAdminPage, QaBlockedError } from "../playwright/adminSession.js";
+import {
+  closeAdminPage,
+  openAdminPage,
+  QaBlockedError,
+  type AdminPageSession
+} from "../playwright/adminSession.js";
 import { fillTinyMCE, pickDateRange, pickFirstElOption, visibleText } from "../playwright/groUi.js";
 import { buildNotExecutedTrace } from "../traceability/caseTraceability.js";
 import { buildR6ExecutionTrace } from "../traceability/r6TraceContracts.js";
@@ -18,30 +23,41 @@ export async function executeR6MasterCampaignCase(
   testCase: NormalizedCase,
   config: RuntimeConfig,
   runDir: string,
-  memory: ExecutionMemory
+  memory: ExecutionMemory,
+  options: { adminSession?: AdminPageSession } = {}
 ): Promise<CaseResult | undefined> {
   if (testCase.stable_id === "R6-B7.2-TC01") {
-    return createMasterCampaign(testCase, config, runDir, memory);
+    return createMasterCampaign(testCase, config, runDir, memory, options);
   }
 
   if (testCase.stable_id === "R6-B7.1-TC01") {
-    return searchMasterCampaign(testCase, config, runDir, memory);
+    return searchMasterCampaign(testCase, config, runDir, memory, options);
+  }
+
+  if (testCase.stable_id === "R6-B7.3-TC01") {
+    return editMasterCampaignBasicInfo(testCase, config, runDir, memory, options);
   }
 
   return undefined;
 }
 
 export function hasR6MasterCampaignExecutor(stableId: string): boolean {
-  return stableId === "R6-B7.2-TC01" || stableId === "R6-B7.1-TC01";
+  return (
+    stableId === "R6-B7.2-TC01" ||
+    stableId === "R6-B7.1-TC01" ||
+    stableId === "R6-B7.3-TC01"
+  );
 }
 
 async function createMasterCampaign(
   testCase: NormalizedCase,
   config: RuntimeConfig,
   runDir: string,
-  memory: ExecutionMemory
+  memory: ExecutionMemory,
+  options: { adminSession?: AdminPageSession }
 ): Promise<CaseResult> {
-  const session = await openAdminPage(config);
+  const session = options.adminSession ?? (await openAdminPage(config));
+  const shouldCloseSession = !options.adminSession;
   const campaignName = `QA-R6-MC-${String(Date.now()).slice(-7)}`;
 
   try {
@@ -88,12 +104,17 @@ async function createMasterCampaign(
       created_test_data: [createdData],
       depends_on_data: [],
       traceability: buildR6ExecutionTrace(testCase, evidencePath),
-      notes: ["Executed with selectors and UI idioms from a previously verified Gro UI flow."]
+      notes: [
+        "Executed with selectors and UI idioms from a previously verified Gro UI flow.",
+        ...(options.adminSession ? ["Reused the shared Admin browser session for this run."] : [])
+      ]
     };
   } catch (error) {
     return toBlockedResult(testCase, error, "Unable to complete Master Campaign creation.");
   } finally {
-    await closeAdminPage(session);
+    if (shouldCloseSession) {
+      await closeAdminPage(session);
+    }
   }
 }
 
@@ -101,9 +122,11 @@ async function searchMasterCampaign(
   testCase: NormalizedCase,
   config: RuntimeConfig,
   runDir: string,
-  memory: ExecutionMemory
+  memory: ExecutionMemory,
+  options: { adminSession?: AdminPageSession }
 ): Promise<CaseResult> {
-  const session = await openAdminPage(config);
+  const session = options.adminSession ?? (await openAdminPage(config));
+  const shouldCloseSession = !options.adminSession;
   const campaignName = memory.createdMasterCampaign?.display_name ?? "Summer Beauty Campaign 2024";
   const searchTerm = memory.createdMasterCampaign?.display_name ?? "Summer";
   const dataDependency = memory.createdMasterCampaign
@@ -160,13 +183,95 @@ async function searchMasterCampaign(
       depends_on_data: dataDependency,
       traceability: buildR6ExecutionTrace(testCase, evidencePath),
       notes: memory.createdMasterCampaign
-        ? ["Search case used the previous create case as setup data."]
-        : ["No created campaign was available in memory, so the original precondition data was used."]
+        ? [
+            "Search case used the previous create case as setup data.",
+            ...(options.adminSession ? ["Reused the shared Admin browser session for this run."] : [])
+          ]
+        : [
+            "No created campaign was available in memory, so the original precondition data was used.",
+            ...(options.adminSession ? ["Reused the shared Admin browser session for this run."] : [])
+          ]
     };
   } catch (error) {
-    return toBlockedResult(testCase, error, `Unable to verify search result for ${campaignName}.`);
+    return toBlockedResult(
+      testCase,
+      error,
+      `Unable to verify search result for ${campaignName}.`,
+      dataDependency
+    );
   } finally {
-    await closeAdminPage(session);
+    if (shouldCloseSession) {
+      await closeAdminPage(session);
+    }
+  }
+}
+
+async function editMasterCampaignBasicInfo(
+  testCase: NormalizedCase,
+  config: RuntimeConfig,
+  runDir: string,
+  memory: ExecutionMemory,
+  options: { adminSession?: AdminPageSession }
+): Promise<CaseResult> {
+  const session = options.adminSession ?? (await openAdminPage(config));
+  const shouldCloseSession = !options.adminSession;
+  const campaignName = memory.createdMasterCampaign?.display_name ?? "Summer Beauty Campaign 2024";
+  const updatedDescription = `QA R6 edit ${campaignName} ${String(Date.now()).slice(-6)}`;
+  const dataDependency = memory.createdMasterCampaign
+    ? [toDataReference(memory.createdMasterCampaign)]
+    : [];
+
+  if (memory.createdMasterCampaign) {
+    addUsedByCase(memory.createdMasterCampaign, testCase.stable_id);
+  }
+
+  try {
+    const { page } = session;
+    const dialog = await openMasterCampaignEditDialog(page, config, campaignName);
+
+    await updateBriefDescription(dialog, updatedDescription);
+    await dialog.getByRole("button", { name: /^Update$/i }).click();
+    await dialog.waitFor({ state: "hidden", timeout: 15_000 });
+
+    await openMasterCampaignDetail(page, config, campaignName);
+    await page.getByText(updatedDescription, { exact: false }).first().waitFor({
+      state: "visible",
+      timeout: 12_000
+    });
+
+    const evidencePath = await screenshot(page, runDir, `${testCase.stable_id}.png`);
+
+    return {
+      stable_id: testCase.stable_id,
+      title: testCase.title,
+      status: "PASS",
+      precondition_result: memory.createdMasterCampaign
+        ? `Used Master Campaign created by R6-B7.2-TC01: ${campaignName}.`
+        : `Used the test case's existing-data precondition: ${campaignName}.`,
+      actual_result: `Opened ${campaignName} from the list Edit action, edited only the Brief Description, clicked Update, opened Detail, and verified the updated description is visible.`,
+      expected_result: testCase.expected_result,
+      evidence_path: evidencePath,
+      created_test_data: [],
+      depends_on_data: dataDependency,
+      traceability: buildR6ExecutionTrace(testCase, evidencePath),
+      notes: [
+        "This executor intentionally covers the Basic Information edit path only.",
+        "Current Gro UI exposes Edit from the Master Campaign list Operation column, so the trace contract records that source-wording difference.",
+        "Target-value and Updated Date assertions remain explicit traceability gaps.",
+        ...(options.adminSession ? ["Reused the shared Admin browser session for this run."] : [])
+      ]
+    };
+  } catch (error) {
+    return toBlockedResult(
+      testCase,
+      error,
+      `Unable to edit Basic Information for ${campaignName}.`,
+      dataDependency
+    );
+  } finally {
+    if (shouldCloseSession) {
+      await closeAdminPage(session);
+    }
   }
 }
 
@@ -183,7 +288,7 @@ function campaignRows(page: Page, campaignName: string): Locator {
 
 async function readVisibleCampaignNames(page: Page): Promise<string[]> {
   const rows = page
-    .locator(".el-table__body-wrapper tbody tr")
+    .locator(".el-table__fixed .el-table__fixed-body-wrapper tbody tr")
     .filter({ visible: true });
   const rowCount = await rows.count();
   const names: string[] = [];
@@ -208,6 +313,122 @@ async function searchByName(page: Page, config: RuntimeConfig, value: string): P
   await searchInput.fill(value);
   await page.keyboard.press("Enter");
   await page.waitForTimeout(1500);
+}
+
+async function openMasterCampaignDetail(
+  page: Page,
+  config: RuntimeConfig,
+  campaignName: string
+): Promise<void> {
+  await searchByName(page, config, campaignName);
+  await clickMasterCampaignListOperation(page, campaignName, "Detail");
+  if (await waitForDetailPage(page, 10_000)) return;
+
+  throw new Error(`Could not open Master Campaign detail page for ${campaignName}.`);
+}
+
+async function openMasterCampaignEditDialog(
+  page: Page,
+  config: RuntimeConfig,
+  campaignName: string
+): Promise<Locator> {
+  await searchByName(page, config, campaignName);
+  await clickMasterCampaignListOperation(page, campaignName, "Edit");
+
+  const dialog = page
+    .locator(".el-dialog:visible, [role=dialog]:visible")
+    .filter({ hasText: /Edit Master Campaign/i })
+    .first();
+  await dialog.waitFor({ state: "visible", timeout: 10_000 });
+  await dialog.locator('input[placeholder="Enter here"]').first().waitFor({
+    state: "visible",
+    timeout: 10_000
+  });
+  await dialog.locator("iframe.tox-edit-area__iframe").waitFor({
+    state: "attached",
+    timeout: 10_000
+  });
+  await dialog.getByRole("button", { name: /^Update$/i }).first().waitFor({
+    state: "visible",
+    timeout: 10_000
+  });
+
+  return dialog;
+}
+
+async function clickMasterCampaignListOperation(
+  page: Page,
+  campaignName: string,
+  operationName: "Detail" | "Edit"
+): Promise<void> {
+  await waitForCampaignRow(page, campaignName);
+
+  const leftRows = page
+    .locator(".el-table__fixed .el-table__fixed-body-wrapper tbody tr")
+    .filter({ visible: true });
+  const targetIndex = await leftRows.evaluateAll((rows, name) => {
+    return rows.findIndex((row) => row.textContent?.includes(String(name)));
+  }, campaignName);
+
+  if (targetIndex < 0) {
+    throw new Error(`Could not locate fixed Master Campaign row for ${campaignName}.`);
+  }
+
+  const rightRows = page
+    .locator(".el-table__fixed-right .el-table__fixed-body-wrapper tbody tr")
+    .filter({ visible: true });
+  const rightRowCount = await rightRows.count();
+  if (rightRowCount <= targetIndex) {
+    throw new Error(
+      `Could not locate Operation row ${targetIndex} for ${campaignName}; only ${rightRowCount} operation rows were visible.`
+    );
+  }
+
+  const operation = rightRows
+    .nth(targetIndex)
+    .getByText(new RegExp(`^${operationName}$`, "i"))
+    .first();
+  await operation.waitFor({ state: "visible", timeout: 10_000 });
+  await operation.scrollIntoViewIfNeeded().catch(() => undefined);
+  await operation.click({ timeout: 8000 });
+}
+
+async function updateBriefDescription(dialog: Locator, description: string): Promise<void> {
+  const briefField = dialog.locator(".el-form-item", { hasText: /Brief Description/i }).first();
+  await briefField.waitFor({ state: "visible", timeout: 8000 });
+
+  const iframeCount = await briefField.locator("iframe.tox-edit-area__iframe").count();
+  if (iframeCount > 0) {
+    await fillTinyMCE(briefField, description, { clear: true });
+    return;
+  }
+
+  const textarea = briefField.locator("textarea").first();
+  if (await textarea.isVisible().catch(() => false)) {
+    await textarea.fill(description);
+    return;
+  }
+
+  const input = briefField.locator("input").first();
+  if (await input.isVisible().catch(() => false)) {
+    await input.fill(description);
+    return;
+  }
+
+  throw new Error("Could not locate editable Brief Description field.");
+}
+
+async function waitForDetailPage(page: Page, timeout: number): Promise<boolean> {
+  return page
+    .waitForURL(/\/masterCampaign\/master-campaign-detail/, { timeout })
+    .then(async () => {
+      await page.getByText(/Dashboard Overview/i).first().waitFor({
+        state: "visible",
+        timeout
+      });
+      return true;
+    })
+    .catch(() => false);
 }
 
 async function fillTargetInputs(dialog: Locator): Promise<void> {
@@ -238,7 +459,8 @@ async function screenshot(page: Page, runDir: string, fileName: string): Promise
 function toBlockedResult(
   testCase: NormalizedCase,
   error: unknown,
-  actualResult: string
+  actualResult: string,
+  dependsOnData: TestDataReference[] = []
 ): CaseResult {
   const message = error instanceof Error ? error.message : String(error);
   const status = error instanceof QaBlockedError ? error.status : "SCRIPT_BLOCKED";
@@ -255,7 +477,7 @@ function toBlockedResult(
     expected_result: testCase.expected_result,
     failure_reason: message,
     created_test_data: [],
-    depends_on_data: [],
+    depends_on_data: dependsOnData,
     traceability: buildNotExecutedTrace(testCase, message),
     notes: [
       status === "ENV_BLOCKED"

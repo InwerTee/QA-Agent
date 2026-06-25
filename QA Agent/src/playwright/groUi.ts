@@ -32,7 +32,7 @@ export async function pickDateRange(
 export async function fillTinyMCE(
   scope: Locator,
   text: string,
-  options: { iframe?: string; timeout?: number } = {}
+  options: { iframe?: string; timeout?: number; clear?: boolean } = {}
 ): Promise<void> {
   const iframe = options.iframe ?? "iframe.tox-edit-area__iframe";
   const timeout = options.timeout ?? 8000;
@@ -41,6 +41,10 @@ export async function fillTinyMCE(
   await scope.locator(iframe).waitFor({ state: "attached", timeout });
   const body = scope.frameLocator(iframe).locator("body");
   await body.click();
+  if (options.clear) {
+    await body.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+    await body.press("Backspace");
+  }
   await body.pressSequentially(text, { timeout });
 }
 

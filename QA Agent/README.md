@@ -4,7 +4,7 @@
 
 最终使用方式应该很简单:同事把本次 release 的 PRD 和测试用例交给 agent,agent 读取、执行,然后输出结果报告。它不应该依赖本地 `参考文档/` 文件夹。
 
-第一版目标很小:先支持 R6 Master Campaign 的真实 test case workbook ingestion,并继续让两条试点 case 跑出清楚的 actual vs expected、状态、失败原因和最小 evidence。它不是完整 QA 平台,也不回写 Excel,不接 Jam,不批量跑完整工作簿。
+第一版目标很小:先支持 R6 Master Campaign 的真实 test case workbook ingestion,并继续让三条试点 case 跑出清楚的 actual vs expected、状态、失败原因和最小 evidence。它不是完整 QA 平台,也不回写 Excel,不接 Jam,不批量跑完整工作簿。
 
 当前的 `inputs/R6/` 是从本地 R6 input package 生成出来的开发样例。它的作用是先证明:
 
@@ -22,8 +22,9 @@ PRD + test case Excel -> normalized cases -> staging 执行 -> actual vs expecte
 - Pilot cases:
   - `R6-B7.2-TC01` - Create Master Campaign with All Fields
   - `R6-B7.1-TC01` - Search by Master Campaign Name (Success)
+  - `R6-B7.3-TC01` - Edit Basic Information Only
 
-这两条组成一个小闭环:先创建 Master Campaign,再搜索刚创建的数据。
+这三条组成一个小闭环:先创建 Master Campaign,再搜索刚创建的数据,然后通过列表操作列编辑 Basic Information,最后打开详情页验证更新结果。
 
 ## 目录
 
@@ -102,16 +103,19 @@ npm run qa:run:r6
 - `raw_source.expected_result`
 - `source.workbook` / `sheet` / `source_row`
 
-已经实现 executor 的 case 还必须有 traceability contract,声明每条原始 step / expected result 被哪个自动化动作或断言覆盖。当前 R6 两条已实现 case 都有 contract;其中 `R6-B7.2-TC01` 被明确标记为 smoke-level partial coverage,不会被误认为完整覆盖了原 case 的所有 expected result。
+已经实现 executor 的 case 还必须有 traceability contract,声明每条原始 step / expected result 被哪个自动化动作或断言覆盖。当前 R6 三条已实现 case 都有 contract;其中 `R6-B7.2-TC01` 和 `R6-B7.3-TC01` 被明确标记为 smoke-level partial coverage,不会被误认为完整覆盖了原 case 的所有 expected result。
 
 如果 `.env` 还没有配置 staging URL 和账号,`run` 会生成 `ENV_BLOCKED` 报告,不会假装执行成功。
 
 ## 真实浏览器执行
 
-R6 两条 pilot case 现在已经接到 Playwright executor:
+R6 三条 pilot case 现在已经接到 Playwright executor:
 
 - `R6-B7.2-TC01`: 登录 Admin Site,进入 Master Campaign List,打开 Add Master Campaign,填写并保存。
 - `R6-B7.1-TC01`: 使用上一条创建出的 Master Campaign 作为前置数据,搜索并验证列表结果。
+- `R6-B7.3-TC01`: 使用上一条创建出的 Master Campaign,从列表 Operation column 打开 Edit 弹窗,编辑 Brief Description,保存后打开详情页验证更新后的描述。
+
+同一轮 `qa run` 会复用一个 Admin browser session。这样 `create -> search -> edit` 可以共享登录态和页面上下文,避免每条 case 都重新启动/关闭浏览器。case 之间仍通过 report 中的 test data lineage 显式记录依赖关系。
 
 执行器参考了历史实现里已经验证过的 Gro UI 惯例,包括:
 

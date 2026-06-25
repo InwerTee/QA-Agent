@@ -1,6 +1,6 @@
 {
   "release": "R6",
-  "generated_at": "2026-06-25T06:29:55.707Z",
+  "generated_at": "2026-06-25T07:21:11.233Z",
   "total_cases": 53,
   "summary": {
     "by_priority": {
@@ -10,8 +10,8 @@
       "P3": 3
     },
     "by_readiness": {
-      "implemented": 2,
-      "candidate": 20,
+      "implemented": 3,
+      "candidate": 19,
       "needs_fixture": 28,
       "manual_review": 3
     },
@@ -30,7 +30,6 @@
     "R6-B7.5-TC01"
   ],
   "next_candidate_ids": [
-    "R6-B7.3-TC01",
     "R6-B7.4-TC03",
     "R6-B7.4-TC01",
     "R6-B7.5-TC01",
@@ -39,7 +38,8 @@
     "R6-B7.1-TC11",
     "R6-B7.2-TC03",
     "R6-B7.2-TC04",
-    "R6-B7.3-TC05"
+    "R6-B7.3-TC05",
+    "R6-B7.4-TC06"
   ],
   "cases": [
     {
@@ -127,7 +127,7 @@
       "title": "Edit Basic Information Only",
       "scenario_group": "B7.3 Edit Master Campaign",
       "priority": "P0",
-      "readiness": "candidate",
+      "readiness": "implemented",
       "complexity": "high",
       "executor_key": "master_campaign.edit",
       "main_flow_order": 3,
@@ -143,7 +143,7 @@
       "blockers": [],
       "rationale": [
         "P0 because this case participates in the proposed R6 main flow.",
-        "candidate because current status is needs_mapping and inferred executor is master_campaign.edit.",
+        "implemented because current status is ready and inferred executor is master_campaign.edit.",
         "high complexity based on UI surface, fixture needs, and assertion depth."
       ],
       "traceability": {
@@ -153,9 +153,15 @@
         "raw_test_case": "Edit Basic Information Only",
         "raw_step_count": 6,
         "raw_expected_count": 5,
-        "has_executor_contract": false
+        "has_executor_contract": true,
+        "contract_coverage": {
+          "covered": 6,
+          "partially_covered": 4,
+          "not_covered": 2,
+          "not_executed": 0
+        }
       },
-      "next_action": "Map selectors and add executor branch for master_campaign.edit."
+      "next_action": "Keep in smoke set and use as dependency seed for later cases."
     },
     {
       "stable_id": "R6-B7.4-TC03",

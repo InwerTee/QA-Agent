@@ -942,7 +942,7 @@
         "reason": "This case needs an existing Master Campaign record; R6-B7.2-TC01 can create one during automated setup."
       }
     ],
-    "automation_status": "needs_mapping",
+    "automation_status": "ready",
     "source": {
       "workbook": "input-packages/R6-sample/R6.xlsx",
       "historical_status": "Passed",

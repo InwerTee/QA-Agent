@@ -9,7 +9,10 @@ test("R6 pilot cases are normalized and addressable by stable id", async () => {
   expect(cases).toHaveLength(53);
   expect(stableIds).toContain("R6-B7.2-TC01");
   expect(stableIds).toContain("R6-B7.1-TC01");
+  expect(stableIds).toContain("R6-B7.3-TC01");
   expect(caseById.get("R6-B7.2-TC01")?.automation_status).toBe("ready");
   expect(caseById.get("R6-B7.1-TC01")?.automation_status).toBe("ready");
+  expect(caseById.get("R6-B7.3-TC01")?.automation_status).toBe("ready");
   expect(caseById.get("R6-B7.1-TC01")?.dependencies[0].stable_id).toBe("R6-B7.2-TC01");
+  expect(caseById.get("R6-B7.3-TC01")?.dependencies[0].stable_id).toBe("R6-B7.2-TC01");
 });
