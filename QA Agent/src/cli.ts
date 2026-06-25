@@ -2,11 +2,12 @@ import { loadCases, filterCases } from "./cases/loadCases.js";
 import { buildSetupPlan } from "./core/setupPlan.js";
 import { exportResultsToWorkbook } from "./export/exportResults.js";
 import { prepareInputPackage } from "./ingestion/prepareInputPackage.js";
+import { runInputPackage } from "./pipeline/runPackage.js";
 import { loadRuntimeConfig } from "./runtime/config.js";
 import { runCases } from "./runner/runCases.js";
 import { triageRelease } from "./triage/triageCases.js";
 
-type ParsedArgs = PrepareArgs | TriageArgs | ExportResultsArgs | CaseCommandArgs;
+type ParsedArgs = PrepareArgs | TriageArgs | ExportResultsArgs | RunPackageArgs | CaseCommandArgs;
 
 interface PrepareArgs {
   command: "prepare";
@@ -27,6 +28,14 @@ interface ExportResultsArgs {
   sourceWorkbook?: string;
   outPath?: string;
   mappingPath?: string;
+}
+
+interface RunPackageArgs {
+  command: "run-package";
+  inputDir: string;
+  release?: string;
+  outDir?: string;
+  caseIds: string[];
 }
 
 interface CaseCommandArgs {
@@ -71,6 +80,23 @@ async function main(): Promise<void> {
         2
       )
     );
+    return;
+  }
+
+  if (args.command === "run-package") {
+    const result = await runInputPackage(args.inputDir, {
+      release: args.release,
+      outDir: args.outDir,
+      caseIds: args.caseIds
+    });
+    console.log(`Prepared cases: ${result.prepared.casesPath}`);
+    console.log(`Triage report: ${result.triage.reportPath}`);
+    console.log(`Selected cases: ${result.selectedCaseIds.join(", ")}`);
+    console.log(`Report JSON: ${result.reportJsonPath}`);
+    console.log(`Report Markdown: ${result.reportMarkdownPath}`);
+    console.log(`Filled workbook: ${result.filledWorkbookPath}`);
+    console.log(`Result mapping: ${result.resultMappingPath}`);
+    console.log(JSON.stringify(result.report.summary, null, 2));
     return;
   }
 
@@ -122,9 +148,13 @@ function parseArgs(argv: string[]): ParsedArgs {
     return parseExportResultsArgs(release, rest);
   }
 
+  if (command === "run-package") {
+    return parseRunPackageArgs(release, rest);
+  }
+
   if (!command || !release) {
     throw new Error(
-      "Usage: npm run qa -- <prepare|triage|export-results|list|plan|run> ..."
+      "Usage: npm run qa -- <prepare|triage|export-results|run-package|list|plan|run> ..."
     );
   }
 
@@ -249,6 +279,44 @@ function parseExportResultsArgs(
   }
 
   return { command: "export-results", reportPath, sourceWorkbook, outPath, mappingPath };
+}
+
+function parseRunPackageArgs(inputDir: string | undefined, rest: string[]): RunPackageArgs {
+  if (!inputDir) {
+    throw new Error(
+      "Usage: npm run qa -- run-package <input-package-dir> [--release <RELEASE>] [--out <OUTPUT_DIR>] [--case <CASE_ID> ...]"
+    );
+  }
+
+  let release: string | undefined;
+  let outDir: string | undefined;
+  const caseIds: string[] = [];
+
+  for (let index = 0; index < rest.length; index += 1) {
+    const token = rest[index];
+
+    if (token === "--release") {
+      release = readNextArg(rest, index, "--release");
+      index += 1;
+      continue;
+    }
+
+    if (token === "--out") {
+      outDir = readNextArg(rest, index, "--out");
+      index += 1;
+      continue;
+    }
+
+    if (token === "--case") {
+      caseIds.push(readNextArg(rest, index, "--case"));
+      index += 1;
+      continue;
+    }
+
+    throw new Error(`Unknown argument: ${token}`);
+  }
+
+  return { command: "run-package", inputDir, release, outDir, caseIds };
 }
 
 function readNextArg(rest: string[], index: number, option: string): string {

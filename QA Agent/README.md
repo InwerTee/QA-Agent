@@ -76,6 +76,28 @@ QA Agent/inputs/<release-or-run-id>/
 
 安装依赖后:
 
+本地 MVP 一键入口:
+
+```bash
+npm run qa -- run-package input-packages/R6-sample --release R6
+```
+
+它会自动执行:
+
+```text
+prepare -> triage -> run implemented cases -> export-results
+```
+
+最后输出:
+
+```text
+reports/runs/<run-id>/report.md
+reports/runs/<run-id>/R6.agent-filled.xlsx
+reports/runs/<run-id>/result_mapping.json
+```
+
+开发/调试时也可以分段运行:
+
 ```bash
 npm run qa:prepare:r6
 npm run qa:triage:r6
@@ -83,6 +105,12 @@ npm run qa:list:r6
 npm run qa:plan:r6
 npm run qa:run:r6
 npm run qa -- export-results reports/runs/<run-id>/report.json
+```
+
+R6 样例也有快捷脚本:
+
+```bash
+npm run qa:run-package:r6
 ```
 
 `qa:prepare:r6` 会从本地 `input-packages/R6-sample/` 读取 R6 PRD 和 Excel,生成 `inputs/R6/manifest.json`、`inputs/R6/cases.normalized.json` 和 `inputs/R6/ingestion_report.md`。`input-packages/` 是本地运行输入,不会进 git。

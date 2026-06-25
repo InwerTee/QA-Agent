@@ -1,6 +1,6 @@
 {
   "name": "gro-qa-agent",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,6 +13,7 @@
     "qa:list:r6": "npm run qa -- list R6",
     "qa:plan:r6": "npm run qa -- plan R6 --case R6-B7.2-TC01 --case R6-B7.1-TC01 --case R6-B7.3-TC01",
     "qa:run:r6": "npm run qa -- run R6 --case R6-B7.2-TC01 --case R6-B7.1-TC01 --case R6-B7.3-TC01",
+    "qa:run-package:r6": "npm run qa -- run-package input-packages/R6-sample --release R6",
     "test:e2e": "playwright test"
   },
   "dependencies": {

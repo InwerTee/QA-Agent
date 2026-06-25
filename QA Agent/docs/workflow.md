@@ -31,6 +31,8 @@ v0.4 把 R6 主流程从 `create -> search` 扩展到 `create -> search -> edit 
 
 v0.5 增加 `export-results`:它把某次 run 的工程化 `report.json` 转换回 Paragon 测试表视角。agent 不修改原 Excel,而是复制一份 workbook,在相关 sheet 原始内容最右侧后一列新增 `Agent Result`,并只填最终状态: `Passed`, `Partial`, `Failed`, `Blocked`, `Review`。actual result、failure reason、evidence、trace coverage 等详细信息保存在内部 `result_mapping.json`,不污染用户看的 Excel。
 
+v0.6 增加 `run-package`:这是本地 CLI MVP Runner。用户给一个 input package 和 release,agent 自动完成 `prepare -> triage -> run implemented cases -> export-results`,最后直接输出 filled Excel 路径。它是后续本地 HTML Wrapper 的后端核心。
+
 ## 正式输入
 
 建议未来每次运行输入一个 input package:
@@ -59,6 +61,12 @@ npm run qa -- prepare ./input-packages/R6-sample --release R6 --out ./inputs/R6
 npm run qa -- triage R6 --out ./inputs/R6
 npm run qa -- run R6 --case R6-B7.2-TC01 --case R6-B7.1-TC01 --case R6-B7.3-TC01
 npm run qa -- export-results ./reports/runs/<run-id>/report.json
+```
+
+v0.6 之后,本地用户优先使用一键入口:
+
+```bash
+npm run qa -- run-package ./input-packages/R6-sample --release R6
 ```
 
 ## 中间输入

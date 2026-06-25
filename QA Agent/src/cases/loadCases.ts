@@ -4,6 +4,10 @@ import type { NormalizedCase } from "../types.js";
 
 export async function loadCases(release: string): Promise<NormalizedCase[]> {
   const casesPath = path.join("inputs", release, "cases.normalized.json");
+  return loadCasesFromFile(casesPath);
+}
+
+export async function loadCasesFromFile(casesPath: string): Promise<NormalizedCase[]> {
   const raw = await readFile(casesPath, "utf8");
   const cases = JSON.parse(raw) as NormalizedCase[];
 
