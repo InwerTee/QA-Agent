@@ -2,18 +2,18 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
-import { loadCases } from "../../src/cases/loadCases.js";
 import { triageRelease } from "../../src/triage/triageCases.js";
+import { makeR6FixtureCases } from "../fixtures/r6FixtureCases.js";
 
 test("R6 triage identifies main flow and next automation candidates", async () => {
-  const cases = await loadCases("R6");
+  const cases = makeR6FixtureCases();
   const outDir = await mkdtemp(path.join(tmpdir(), "r6-triage-"));
   const result = await triageRelease("R6", cases, { outDir });
   const triageById = new Map(
     result.automationMap.cases.map((triage) => [triage.stable_id, triage])
   );
 
-  expect(result.automationMap.total_cases).toBe(53);
+  expect(result.automationMap.total_cases).toBe(6);
   expect(result.automationMap.main_flow).toEqual([
     "R6-B7.2-TC01",
     "R6-B7.1-TC01",

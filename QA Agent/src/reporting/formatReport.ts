@@ -59,12 +59,12 @@ export function formatMarkdownReport(report: RunReport): string {
     lines.push("");
     lines.push("## Created Test Data");
     lines.push("");
-    lines.push("| Data | Type | Created By | Used By | Cleanup |");
-    lines.push("| --- | --- | --- | --- | --- |");
+    lines.push("| Data ID | Display Name | Type | Created By | Used By | Cleanup |");
+    lines.push("| --- | --- | --- | --- | --- | --- |");
 
     for (const data of report.created_test_data) {
       lines.push(
-        `| ${data.display_name} | ${data.data_type} | ${data.created_by_case} | ${data.used_by_cases.join(", ")} | ${data.cleanup_status} |`
+        `| ${data.data_id} | ${data.display_name} | ${data.data_type} | ${data.created_by_case} | ${data.used_by_cases.join(", ")} | ${data.cleanup_status} |`
       );
     }
   }
@@ -74,6 +74,7 @@ export function formatMarkdownReport(report: RunReport): string {
     lines.push(`## ${result.stable_id} - ${result.title}`);
     lines.push("");
     lines.push(`- Status: ${result.status}`);
+    lines.push(`- Case execution ID: ${result.case_execution_id}`);
     lines.push(`- Precondition result: ${result.precondition_result}`);
     lines.push(`- Actual result: ${result.actual_result}`);
 
@@ -108,7 +109,9 @@ export function formatMarkdownReport(report: RunReport): string {
       lines.push("");
       lines.push("Depends on test data:");
       for (const data of result.depends_on_data) {
-        lines.push(`- ${data.data_type}: ${data.display_name} from ${data.source_case}`);
+        lines.push(
+          `- ${data.data_type}: ${data.display_name} (${data.data_id}) from ${data.source_case}`
+        );
       }
     }
 

@@ -16,6 +16,9 @@ Version1/
 input-packages/
 **/input-packages/
 
+# Generated normalized inputs are runtime artifacts.
+QA Agent/inputs/
+
 # Browser/test runtime outputs
 playwright-report/
 test-results/

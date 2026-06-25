@@ -148,6 +148,8 @@ export interface SetupPlan {
 }
 
 export interface CaseResult {
+  run_id: string;
+  case_execution_id: string;
   stable_id: string;
   title: string;
   status: QaStatus;
@@ -178,6 +180,7 @@ export interface ExecutionMemory {
 
 export interface TestDataRecord {
   data_id: string;
+  run_id: string;
   data_type: "master_campaign" | "campaign" | "creator" | "kr_request" | "lock_stock" | "unknown";
   display_name: string;
   created_by_case: string;
@@ -190,6 +193,7 @@ export interface TestDataRecord {
 
 export interface TestDataReference {
   data_id: string;
+  run_id: string;
   data_type: TestDataRecord["data_type"];
   display_name: string;
   source_case: string;

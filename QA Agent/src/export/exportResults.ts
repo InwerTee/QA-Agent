@@ -35,6 +35,8 @@ export interface ResultMapping {
 }
 
 export interface ResultMappingCase {
+  run_id: string;
+  case_execution_id: string;
   stable_id: string;
   source_sheet: string;
   source_row: number;
@@ -110,6 +112,8 @@ export async function exportResultsToWorkbook(
       const resultCell = sheet.cell(caseResult.traceability.source_row, resultColumn);
       resultCell.value(finalStatus);
       mappingCases.push({
+        run_id: caseResult.run_id,
+        case_execution_id: caseResult.case_execution_id,
         stable_id: caseResult.stable_id,
         source_sheet: sheetName,
         source_row: caseResult.traceability.source_row,

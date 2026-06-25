@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { missingAdminEnv, type RuntimeConfig } from "../runtime/config.js";
 import type { CaseResult, ExecutionMemory, NormalizedCase, RunReport } from "../types.js";
+import { caseExecutionId } from "../core/runIdentity.js";
 import { formatMarkdownReport, summarize } from "../reporting/formatReport.js";
 import { executeR6MasterCampaignCase } from "../executors/r6MasterCampaign.js";
 import { buildNotExecutedTrace } from "../traceability/caseTraceability.js";
@@ -29,7 +30,9 @@ export async function runCases(
 
   try {
     for (const testCase of cases) {
-      results.push(await runSingleCase(testCase, config, runDir, memory, sharedAdminSession));
+      results.push(
+        await runSingleCase(testCase, config, runDir, memory, sharedAdminSession, runId)
+      );
     }
   } finally {
     if (sharedAdminSession.session) {
@@ -62,13 +65,16 @@ async function runSingleCase(
   config: RuntimeConfig,
   runDir: string,
   memory: ExecutionMemory,
-  sharedAdminSession: SharedAdminSession
+  sharedAdminSession: SharedAdminSession,
+  runId: string
 ): Promise<CaseResult> {
   if (testCase.site === "admin") {
     const missing = missingAdminEnv(config);
 
     if (missing.length > 0) {
       return {
+        run_id: runId,
+        case_execution_id: caseExecutionId(runId, testCase.stable_id),
         stable_id: testCase.stable_id,
         title: testCase.title,
         status: "ENV_BLOCKED",
@@ -90,11 +96,11 @@ async function runSingleCase(
     }
 
     if (sharedAdminSession.error) {
-      return sessionBlockedResult(testCase, sharedAdminSession.error);
+      return sessionBlockedResult(testCase, sharedAdminSession.error, runId);
     }
   }
 
-  const r6Result = await executeR6MasterCampaignCase(testCase, config, runDir, memory, {
+  const r6Result = await executeR6MasterCampaignCase(testCase, config, runDir, memory, runId, {
     adminSession: sharedAdminSession.session
   });
   if (r6Result) {
@@ -102,6 +108,8 @@ async function runSingleCase(
   }
 
   return {
+    run_id: runId,
+    case_execution_id: caseExecutionId(runId, testCase.stable_id),
     stable_id: testCase.stable_id,
     title: testCase.title,
     status: "SCRIPT_BLOCKED",
@@ -145,11 +153,17 @@ async function openSharedAdminSession(
   }
 }
 
-function sessionBlockedResult(testCase: NormalizedCase, error: unknown): CaseResult {
+function sessionBlockedResult(
+  testCase: NormalizedCase,
+  error: unknown,
+  runId: string
+): CaseResult {
   const message = error instanceof Error ? error.message : String(error);
   const status = error instanceof QaBlockedError ? error.status : "SCRIPT_BLOCKED";
 
   return {
+    run_id: runId,
+    case_execution_id: caseExecutionId(runId, testCase.stable_id),
     stable_id: testCase.stable_id,
     title: testCase.title,
     status,

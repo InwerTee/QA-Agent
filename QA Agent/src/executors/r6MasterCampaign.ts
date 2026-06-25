@@ -9,6 +9,7 @@ import type {
   TestDataRecord,
   TestDataReference
 } from "../types.js";
+import { caseExecutionId, testDataId } from "../core/runIdentity.js";
 import {
   closeAdminPage,
   openAdminPage,
@@ -24,18 +25,19 @@ export async function executeR6MasterCampaignCase(
   config: RuntimeConfig,
   runDir: string,
   memory: ExecutionMemory,
+  runId: string,
   options: { adminSession?: AdminPageSession } = {}
 ): Promise<CaseResult | undefined> {
   if (testCase.stable_id === "R6-B7.2-TC01") {
-    return createMasterCampaign(testCase, config, runDir, memory, options);
+    return createMasterCampaign(testCase, config, runDir, memory, runId, options);
   }
 
   if (testCase.stable_id === "R6-B7.1-TC01") {
-    return searchMasterCampaign(testCase, config, runDir, memory, options);
+    return searchMasterCampaign(testCase, config, runDir, memory, runId, options);
   }
 
   if (testCase.stable_id === "R6-B7.3-TC01") {
-    return editMasterCampaignBasicInfo(testCase, config, runDir, memory, options);
+    return editMasterCampaignBasicInfo(testCase, config, runDir, memory, runId, options);
   }
 
   return undefined;
@@ -54,6 +56,7 @@ async function createMasterCampaign(
   config: RuntimeConfig,
   runDir: string,
   memory: ExecutionMemory,
+  runId: string,
   options: { adminSession?: AdminPageSession }
 ): Promise<CaseResult> {
   const session = options.adminSession ?? (await openAdminPage(config));
@@ -90,10 +93,17 @@ async function createMasterCampaign(
     await waitForCampaignRow(page, campaignName);
 
     const evidencePath = await screenshot(page, runDir, `${testCase.stable_id}.png`);
-    const createdData = createMasterCampaignRecord(testCase.stable_id, campaignName, evidencePath);
+    const createdData = createMasterCampaignRecord(
+      runId,
+      testCase.stable_id,
+      campaignName,
+      evidencePath
+    );
     memory.createdMasterCampaign = createdData;
 
     return {
+      run_id: runId,
+      case_execution_id: caseExecutionId(runId, testCase.stable_id),
       stable_id: testCase.stable_id,
       title: testCase.title,
       status: "PASS",
@@ -110,7 +120,12 @@ async function createMasterCampaign(
       ]
     };
   } catch (error) {
-    return toBlockedResult(testCase, error, "Unable to complete Master Campaign creation.");
+    return toBlockedResult(
+      testCase,
+      error,
+      "Unable to complete Master Campaign creation.",
+      runId
+    );
   } finally {
     if (shouldCloseSession) {
       await closeAdminPage(session);
@@ -123,6 +138,7 @@ async function searchMasterCampaign(
   config: RuntimeConfig,
   runDir: string,
   memory: ExecutionMemory,
+  runId: string,
   options: { adminSession?: AdminPageSession }
 ): Promise<CaseResult> {
   const session = options.adminSession ?? (await openAdminPage(config));
@@ -149,6 +165,8 @@ async function searchMasterCampaign(
 
     if (visibleNames.length > 0 && visibleNames.some((name) => !name.includes(searchTerm))) {
       return {
+        run_id: runId,
+        case_execution_id: caseExecutionId(runId, testCase.stable_id),
         stable_id: testCase.stable_id,
         title: testCase.title,
         status: "PRODUCT_BUG",
@@ -170,6 +188,8 @@ async function searchMasterCampaign(
     }
 
     return {
+      run_id: runId,
+      case_execution_id: caseExecutionId(runId, testCase.stable_id),
       stable_id: testCase.stable_id,
       title: testCase.title,
       status: "PASS",
@@ -197,6 +217,7 @@ async function searchMasterCampaign(
       testCase,
       error,
       `Unable to verify search result for ${campaignName}.`,
+      runId,
       dataDependency
     );
   } finally {
@@ -211,6 +232,7 @@ async function editMasterCampaignBasicInfo(
   config: RuntimeConfig,
   runDir: string,
   memory: ExecutionMemory,
+  runId: string,
   options: { adminSession?: AdminPageSession }
 ): Promise<CaseResult> {
   const session = options.adminSession ?? (await openAdminPage(config));
@@ -242,6 +264,8 @@ async function editMasterCampaignBasicInfo(
     const evidencePath = await screenshot(page, runDir, `${testCase.stable_id}.png`);
 
     return {
+      run_id: runId,
+      case_execution_id: caseExecutionId(runId, testCase.stable_id),
       stable_id: testCase.stable_id,
       title: testCase.title,
       status: "PASS",
@@ -266,6 +290,7 @@ async function editMasterCampaignBasicInfo(
       testCase,
       error,
       `Unable to edit Basic Information for ${campaignName}.`,
+      runId,
       dataDependency
     );
   } finally {
@@ -460,12 +485,15 @@ function toBlockedResult(
   testCase: NormalizedCase,
   error: unknown,
   actualResult: string,
+  runId: string,
   dependsOnData: TestDataReference[] = []
 ): CaseResult {
   const message = error instanceof Error ? error.message : String(error);
   const status = error instanceof QaBlockedError ? error.status : "SCRIPT_BLOCKED";
 
   return {
+    run_id: runId,
+    case_execution_id: caseExecutionId(runId, testCase.stable_id),
     stable_id: testCase.stable_id,
     title: testCase.title,
     status,
@@ -492,12 +520,14 @@ function adminUrl(config: RuntimeConfig, route: string): string {
 }
 
 function createMasterCampaignRecord(
+  runId: string,
   createdByCase: string,
   campaignName: string,
   evidencePath: string
 ): TestDataRecord {
   return {
-    data_id: `master_campaign:${campaignName}`,
+    data_id: testDataId(runId, createdByCase, "master_campaign"),
+    run_id: runId,
     data_type: "master_campaign",
     display_name: campaignName,
     created_by_case: createdByCase,
@@ -512,6 +542,7 @@ function createMasterCampaignRecord(
 function toDataReference(data: TestDataRecord): TestDataReference {
   return {
     data_id: data.data_id,
+    run_id: data.run_id,
     data_type: data.data_type,
     display_name: data.display_name,
     source_case: data.created_by_case

@@ -69,7 +69,12 @@ export async function prepareInputPackage(
   const absoluteInputDir = path.resolve(inputDir);
   const files = await findInputFiles(absoluteInputDir);
   const workbook = await parseWorkbook(files.workbookPath);
-  const release = options.release ?? inferRelease(workbook.metadata, path.basename(inputDir));
+  const release =
+    options.release ??
+    inferRelease(workbook.metadata, [
+      path.basename(files.workbookPath, path.extname(files.workbookPath)),
+      path.basename(inputDir)
+    ]);
   const title = inferTitle(workbook.metadata, release);
   const cases = parseCases(workbook, release, files.workbookPath);
   const outDir = path.resolve(options.outDir ?? path.join("inputs", release));
@@ -330,10 +335,10 @@ function extractGroupCode(groupName: string): string {
   return match ? match[0].toUpperCase() : "G0";
 }
 
-function inferRelease(metadata: Record<string, string>, fallback: string): string {
-  const text = `${metadata.release ?? ""} ${metadata.requirementname ?? ""} ${fallback}`;
+export function inferRelease(metadata: Record<string, string>, fallbacks: string[]): string {
+  const text = `${metadata.release ?? ""} ${metadata.requirementname ?? ""} ${fallbacks.join(" ")}`;
   const match = text.match(/\bR\d+(?:\.\d+)?\b/i);
-  return match ? match[0].toUpperCase() : fallback.replace(/\W+/g, "-");
+  return match ? match[0].toUpperCase() : fallbacks[0].replace(/\W+/g, "-");
 }
 
 function inferTitle(metadata: Record<string, string>, release: string): string {

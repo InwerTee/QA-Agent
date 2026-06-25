@@ -31,7 +31,9 @@ v0.4 把 R6 主流程从 `create -> search` 扩展到 `create -> search -> edit 
 
 v0.5 增加 `export-results`:它把某次 run 的工程化 `report.json` 转换回 Paragon 测试表视角。agent 不修改原 Excel,而是复制一份 workbook,在相关 sheet 原始内容最右侧后一列新增 `Agent Result`,并只填最终状态: `Passed`, `Partial`, `Failed`, `Blocked`, `Review`。actual result、failure reason、evidence、trace coverage 等详细信息保存在内部 `result_mapping.json`,不污染用户看的 Excel。
 
-v0.6 增加 `run-package`:这是本地 CLI MVP Runner。用户给一个 input package 和 release,agent 自动完成 `prepare -> triage -> run implemented cases -> export-results`,最后直接输出 filled Excel 路径。它是后续本地 HTML Wrapper 的后端核心。
+v0.6 增加 `run-package`:这是本地 CLI MVP Runner。用户给一个 input package,agent 自动完成 `prepare -> triage -> run implemented cases -> export-results`,最后直接输出 filled Excel 路径。CLI 仍可用 `--release` 做开发期覆盖,但正常运行应优先从测试用例内容或文件名推断 release。它是后续本地 HTML Wrapper 的后端核心。
+
+v0.7 增加本地 HTML Wrapper:用户运行 `npm run qa:web`,浏览器打开 `http://127.0.0.1:4173`,上传 PRD PDF 和 Paragon `.xlsx`,可选输入 `Run label`,点击 Run,等待后下载 filled Excel 或打开结果文件夹。`Run label` 只是本地运行标签,不参与 release/case 匹配;release 应由 agent 从输入文件推断。它不做线上部署、多人并发、权限系统或复杂 run history;只是本地页面包住 v0.6 pipeline。
 
 ## 正式输入
 
@@ -68,6 +70,28 @@ v0.6 之后,本地用户优先使用一键入口:
 ```bash
 npm run qa -- run-package ./input-packages/R6-sample --release R6
 ```
+
+v0.7 之后,不会敲命令的本地用户可以使用网页入口:
+
+```bash
+npm run qa:web
+```
+
+网页入口必须通过本地 server 打开 `http://127.0.0.1:4173`。`src/web/static/index.html` 只是前端文件,不能单独用 `file://` 打开运行,否则页面无法调用 `/api/run`。
+
+网页上的 `Run label` 只是方便用户识别本次运行的名字,例如 `Test` 或 `R6 smoke`。它不能决定 agent 跑什么。agent 应该根据上传的 PRD / test case 文件推断 release,再生成 stable case id 并匹配 executor。
+
+## 执行身份与结果追踪
+
+不能因为 Gro 系统里出现了某个 `QA-*` 名字,就判断某条测试用例已经被 agent 跑过。名字只是 UI 操作和人工识别 test data 的可读标签。
+
+agent 判断“是否运行过 / 运行结果是什么”必须基于本次 run 生成的结构化文件:
+
+- `report.json`:记录 `run_id`、每条 `case_result`、`case_execution_id`、状态、actual vs expected、evidence 和 traceability。
+- `result_mapping.json`:记录每条原始 case 的 source sheet / row、最终填入 Excel 的状态、`run_id` 和 `case_execution_id`。
+- `report.md`:给人阅读的执行报告,包括 created test data 的内部 `data_id` 和 display name。
+
+created test data 的内部 `data_id` 也不能只等于 campaign name。当前使用 `run_id + case_id + data_type` 生成内部身份,再把 campaign name 作为 `display_name` 保存。这样即使 Gro 里有历史同名或相似名字的数据,也不会被误认为是本次执行证据。
 
 ## 中间输入
 

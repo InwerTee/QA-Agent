@@ -1,13 +1,13 @@
 import { expect, test } from "@playwright/test";
-import { loadCases } from "../../src/cases/loadCases.js";
 import { hasR6MasterCampaignExecutor } from "../../src/executors/r6MasterCampaign.js";
 import {
   buildR6ExecutionTrace,
   hasR6TraceContract
 } from "../../src/traceability/r6TraceContracts.js";
+import { makeR6FixtureCases } from "../fixtures/r6FixtureCases.js";
 
 test("R6 normalized cases preserve raw Excel source text", async () => {
-  const cases = await loadCases("R6");
+  const cases = makeR6FixtureCases();
   const createCase = cases.find((testCase) => testCase.stable_id === "R6-B7.2-TC01");
 
   expect(createCase?.source_row).toBe(28);
@@ -18,7 +18,7 @@ test("R6 normalized cases preserve raw Excel source text", async () => {
 });
 
 test("implemented R6 executors must declare traceability contracts", async () => {
-  const cases = await loadCases("R6");
+  const cases = makeR6FixtureCases();
   const implementedCases = cases.filter((testCase) =>
     hasR6MasterCampaignExecutor(testCase.stable_id)
   );
@@ -40,7 +40,7 @@ test("implemented R6 executors must declare traceability contracts", async () =>
 });
 
 test("R6 edit basic info executor is traceable but does not over-claim target/date coverage", async () => {
-  const cases = await loadCases("R6");
+  const cases = makeR6FixtureCases();
   const editCase = cases.find((testCase) => testCase.stable_id === "R6-B7.3-TC01");
 
   expect(editCase).toBeDefined();
@@ -57,7 +57,7 @@ test("R6 edit basic info executor is traceable but does not over-claim target/da
 });
 
 test("R6 create smoke executor is traceable but not over-claimed as full coverage", async () => {
-  const cases = await loadCases("R6");
+  const cases = makeR6FixtureCases();
   const createCase = cases.find((testCase) => testCase.stable_id === "R6-B7.2-TC01");
 
   expect(createCase).toBeDefined();

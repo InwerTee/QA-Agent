@@ -83,7 +83,13 @@ test("export-results fills one Agent Result column in a copied workbook", async 
   const filledWorkbook = await XlsxPopulate.fromFileAsync(result.outputWorkbookPath);
   const filledSheet = filledWorkbook.sheet("Sheet1");
   const mapping = JSON.parse(await readFile(result.mappingPath, "utf8")) as {
-    cases: Array<{ stable_id: string; final_filled_status: string; filled_cell: string }>;
+    cases: Array<{
+      run_id: string;
+      case_execution_id: string;
+      stable_id: string;
+      final_filled_status: string;
+      filled_cell: string;
+    }>;
     result_column_by_sheet: Record<string, string>;
   };
 
@@ -93,11 +99,15 @@ test("export-results fills one Agent Result column in a copied workbook", async 
   expect(mapping.result_column_by_sheet.Sheet1).toBe("D");
   expect(mapping.cases).toEqual([
     expect.objectContaining({
+      run_id: "R6-test-run",
+      case_execution_id: "R6-test-run:R6-B7.2-TC01",
       stable_id: "R6-B7.2-TC01",
       final_filled_status: "Passed",
       filled_cell: "Sheet1!D2"
     }),
     expect.objectContaining({
+      run_id: "R6-test-run",
+      case_execution_id: "R6-test-run:R6-B7.3-TC01",
       stable_id: "R6-B7.3-TC01",
       final_filled_status: "Partial",
       filled_cell: "Sheet1!D3"
@@ -119,6 +129,8 @@ function fakeCase(
   const rawTestCase = options.rawTestCase ?? "Create Master Campaign with All Fields";
 
   return {
+    run_id: "R6-test-run",
+    case_execution_id: `R6-test-run:${stableId}`,
     stable_id: stableId,
     title: rawTestCase,
     status,

@@ -48,6 +48,7 @@ src/
   runner/                   # 执行调度
   reporting/                # JSON/Markdown 报告
   runtime/                  # env/runtime config
+  web/                      # 本地 HTML runner
 
 reports/runs/               # 单次运行产物,不进 git
 knowledge/                  # Gro 系统知识沉淀
@@ -113,6 +114,22 @@ R6 样例也有快捷脚本:
 npm run qa:run-package:r6
 ```
 
+本地网页入口:
+
+```bash
+npm run qa:web
+```
+
+启动后会打开:
+
+```text
+http://127.0.0.1:4173
+```
+
+不要直接双击或打开 `src/web/static/index.html`。这个页面需要本地 Node server 提供 `/api/run`,所以直接用 `file://` 打开会无法提交运行。
+
+页面支持上传 PRD PDF、Paragon test case `.xlsx`,可选填写一个本地 `Run label`,点击 Run 后等待结果。`Run label` 只是方便识别本次运行的名字,不会决定 case id 或 executor 匹配;agent 会从上传的测试用例内容和文件名推断 release。完成后可以下载 filled Excel / report,也可以打开结果文件夹。
+
 `qa:prepare:r6` 会从本地 `input-packages/R6-sample/` 读取 R6 PRD 和 Excel,生成 `inputs/R6/manifest.json`、`inputs/R6/cases.normalized.json` 和 `inputs/R6/ingestion_report.md`。`input-packages/` 是本地运行输入,不会进 git。
 
 `qa:triage:r6` 会读取 `inputs/R6/cases.normalized.json`,生成 `inputs/R6/automation_map.json` 和 `inputs/R6/triage_report.md`。它不会跑浏览器,只负责判断:
@@ -123,6 +140,8 @@ npm run qa:run-package:r6
 - 哪些 case 更适合人工复核或先明确 evidence 策略。
 
 `export-results` 会读取某次 run 的 `report.json`,复制 Paragon 原 Excel,并在每个相关 sheet 的原始内容最右侧后一列写入一列 `Agent Result`。它只填最终状态,不把 actual result、failure reason、evidence 或 trace notes 写进用户看的 Excel。详细映射会单独保存为 `result_mapping.json`。
+
+不要用 Gro 系统里的 `QA-*` campaign 名字判断某条 case 是否运行过。名字只是 test data 的 `display_name`;真正的运行身份以 `report.json` / `result_mapping.json` 里的 `run_id` 和 `case_execution_id` 为准。
 
 示例输出:
 

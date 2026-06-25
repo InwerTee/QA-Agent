@@ -25,6 +25,7 @@ export interface RunPackageResult {
   prepared: PrepareResult;
   triage: TriageResult;
   selectedCaseIds: string[];
+  processedCaseIds: string[];
   report: RunReport;
   reportJsonPath: string;
   reportMarkdownPath: string;
@@ -43,15 +44,10 @@ export async function runInputPackage(
   });
   const cases = await loadCasesFromFile(prepared.casesPath);
   const triage = await triageRelease(prepared.release, cases, { outDir: prepared.outDir });
-  const selectedCases =
-    options.caseIds && options.caseIds.length > 0
-      ? filterCases(cases, options.caseIds)
-      : selectImplementedCases(cases, triage.automationMap);
+  const selectedCases = selectCasesForPackageRun(cases, options.caseIds);
 
   if (selectedCases.length === 0) {
-    throw new Error(
-      "No implemented cases were found for this input package. Run triage output to inspect readiness."
-    );
+    throw new Error("No test cases were found for this input package.");
   }
 
   const runResult = await runCases(prepared.release, selectedCases, loadRuntimeConfig());
@@ -63,6 +59,7 @@ export async function runInputPackage(
     prepared,
     triage,
     selectedCaseIds: selectedCases.map((testCase) => testCase.stable_id),
+    processedCaseIds: selectedCases.map((testCase) => testCase.stable_id),
     report: runResult.report,
     reportJsonPath: runResult.jsonPath,
     reportMarkdownPath: runResult.markdownPath,
@@ -70,6 +67,17 @@ export async function runInputPackage(
     resultMappingPath: exportResult.mappingPath,
     exportResult
   };
+}
+
+export function selectCasesForPackageRun(
+  cases: NormalizedCase[],
+  requestedCaseIds: string[] = []
+): NormalizedCase[] {
+  if (requestedCaseIds.length > 0) {
+    return filterCases(cases, requestedCaseIds);
+  }
+
+  return [...cases].sort((left, right) => left.source_row - right.source_row);
 }
 
 export function selectImplementedCases(
