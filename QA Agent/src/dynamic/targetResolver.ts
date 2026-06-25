@@ -107,40 +107,101 @@ async function resolveLabeledFormControl(
   const label = formLabelFromTarget(query.target);
   if (!label) return undefined;
 
-  const dialog = page.locator('.el-dialog__wrapper:visible, [role="dialog"]:visible').last();
-  const formItem = dialog
-    .locator(".el-form-item, .form-item")
-    .filter({ hasText: new RegExp(`\\b${escapeRegExp(label)}\\b`, "i") })
-    .first();
-  const locator = formItem
-    .locator('input, textarea, [role="combobox"], .el-select, .el-date-editor, .el-input__inner')
-    .first();
+  const scopes = [
+    page.locator('.el-dialog__wrapper:visible, [role="dialog"]:visible').last(),
+    page.locator('.el-drawer:visible, .el-drawer__body:visible').last(),
+    page.locator('.el-popover:visible, .el-popper:visible, [role="tooltip"]:visible').last(),
+    page.locator("body").first()
+  ];
 
-  if (!(await locator.isVisible({ timeout: 500 }).catch(() => false))) {
+  for (const scope of scopes) {
+    const locator = await resolveControlWithinScope(scope, label);
+    if (!locator || !(await locator.isVisible({ timeout: 500 }).catch(() => false))) {
+      continue;
+    }
+
+    const candidate = syntheticCandidate(label);
+
+    return {
+      status: "found",
+      locator,
+      candidate: {
+        kind: "input",
+        candidate,
+        score: 130,
+        reasons: [`form label match: ${label}`]
+      },
+      candidates: [
+        {
+          kind: "input",
+          candidate,
+          score: 130,
+          reasons: [`form label match: ${label}`]
+        }
+      ],
+      reason: `form label match: ${label}`
+    };
+  }
+
+  return undefined;
+}
+
+async function resolveControlWithinScope(
+  scope: Locator,
+  label: string
+): Promise<Locator | undefined> {
+  if (!(await scope.isVisible({ timeout: 300 }).catch(() => false))) {
     return undefined;
   }
 
-  const candidate = syntheticCandidate(label);
+  const labelRegex = new RegExp(`\\b${escapeRegExp(label)}\\b`, "i");
+  const formItem = scope
+    .locator(".el-form-item, .form-item, .ant-form-item, label")
+    .filter({ hasText: labelRegex })
+    .first();
+  const formLocator = await firstVisibleLocator(
+    formItem.locator(controlSelector())
+  );
 
-  return {
-    status: "found",
-    locator,
-    candidate: {
-      kind: "input",
-      candidate,
-      score: 120,
-      reasons: [`dialog form label match: ${label}`]
-    },
-    candidates: [
-      {
-        kind: "input",
-        candidate,
-        score: 120,
-        reasons: [`dialog form label match: ${label}`]
-      }
-    ],
-    reason: `dialog form label match: ${label}`
-  };
+  if (formLocator) {
+    return formLocator;
+  }
+
+  const nearbyControl = await firstVisibleLocator(
+    scope.locator(controlSelector()).filter({ hasText: labelRegex })
+  );
+
+  if (nearbyControl) {
+    return nearbyControl;
+  }
+
+  const placeholderControl = scope
+    .locator(
+      `input[placeholder*="${cssEscape(label)}" i], textarea[placeholder*="${cssEscape(label)}" i], [aria-label*="${cssEscape(label)}" i]`
+    )
+    .first();
+
+  if (await placeholderControl.isVisible({ timeout: 300 }).catch(() => false)) {
+    return placeholderControl;
+  }
+
+  return undefined;
+}
+
+async function firstVisibleLocator(locator: Locator): Promise<Locator | undefined> {
+  const count = await locator.count().catch(() => 0);
+  for (let index = 0; index < Math.min(count, 12); index += 1) {
+    const candidate = locator.nth(index);
+    if (await candidate.isVisible({ timeout: 150 }).catch(() => false)) {
+      return candidate;
+    }
+  }
+
+  return undefined;
+}
+
+function controlSelector(): string {
+  return 'input, textarea, [role="combobox"], .el-select, .el-date-editor, .el-input__inner, .ant-select, .ant-picker';
 }
 
 export function rankElementCandidates(
@@ -368,7 +429,7 @@ function formLabelFromTarget(target?: string): string | undefined {
   const label = target
     .replace(/^(the|a|an)\s+/i, "")
     .replace(/^(master campaign|campaign|filter)\s+/i, "")
-    .replace(/\b(dropdown|select|multiselect|multi-select|field|input|control|filter)\b/gi, "")
+    .replace(/\b(dropdown|select|selection|multiselect|multi-select|field|input|control|filter)\b/gi, "")
     .replace(/\s+/g, " ")
     .trim();
 
@@ -463,4 +524,8 @@ function normalize(value: string): string {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function cssEscape(value: string): string {
+  return value.replace(/["\\]/g, "\\$&");
 }

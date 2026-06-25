@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { missingAdminEnv, type RuntimeConfig } from "../runtime/config.js";
-import type { CaseResult, ExecutionMemory, NormalizedCase, QaStatus, RunReport } from "../types.js";
+import { missingSiteEnv, type RuntimeConfig } from "../runtime/config.js";
+import type { CaseResult, ExecutionMemory, NormalizedCase, QaStatus, RunReport, Site } from "../types.js";
 import { caseExecutionId } from "../core/runIdentity.js";
 import { formatMarkdownReport, summarize } from "../reporting/formatReport.js";
 import { executeR6MasterCampaignCase } from "../executors/r6MasterCampaign.js";
@@ -9,7 +9,7 @@ import { runDynamicCase } from "../dynamic/dynamicCaseRunner.js";
 import { buildNotExecutedTrace } from "../traceability/caseTraceability.js";
 import {
   closeAdminPage,
-  openAdminPage,
+  openSitePage,
   QaBlockedError,
   type AdminPageSession
 } from "../playwright/adminSession.js";
@@ -51,7 +51,7 @@ export async function runCases(
 
   const results: CaseResult[] = [];
   const memory: ExecutionMemory = {};
-  const sharedAdminSession = await openSharedAdminSession(cases, config);
+  const sharedSessions = await openSharedSiteSessions(cases, config);
   const emitProgress = (progress: Omit<RunCasesProgress, "runId" | "release" | "total" | "summary">) => {
     options.onProgress?.({
       runId,
@@ -83,18 +83,19 @@ export async function runCases(
         config,
         runDir,
         memory,
-        sharedAdminSession,
+        sharedSessions,
         runId,
         options.caseTimeoutMs ?? config.caseTimeoutMs
       );
       results.push(result);
 
-      if (timedOut && sharedAdminSession.session) {
-        await closeAdminPage(sharedAdminSession.session);
-        sharedAdminSession.session = undefined;
-        sharedAdminSession.error = new QaBlockedError(
+      const timedOutSession = sharedSessions.sessions[testCase.site];
+      if (timedOut && timedOutSession) {
+        await closeAdminPage(timedOutSession);
+        sharedSessions.sessions[testCase.site] = undefined;
+        sharedSessions.errors[testCase.site] = new QaBlockedError(
           "SCRIPT_BLOCKED",
-          `The shared Admin browser session was closed after ${testCase.stable_id} exceeded the case timeout.`
+          `The shared ${testCase.site} browser session was closed after ${testCase.stable_id} exceeded the case timeout.`
         );
       }
 
@@ -109,8 +110,10 @@ export async function runCases(
       });
     }
   } finally {
-    if (sharedAdminSession.session) {
-      await closeAdminPage(sharedAdminSession.session);
+    for (const session of Object.values(sharedSessions.sessions)) {
+      if (session) {
+        await closeAdminPage(session);
+      }
     }
   }
 
@@ -145,20 +148,20 @@ async function runSingleCaseWithTimeout(
   config: RuntimeConfig,
   runDir: string,
   memory: ExecutionMemory,
-  sharedAdminSession: SharedAdminSession,
+  sharedSessions: SharedSiteSessions,
   runId: string,
   timeoutMs: number
 ): Promise<{ result: CaseResult; timedOut: boolean }> {
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
     return {
-      result: await runSingleCase(testCase, config, runDir, memory, sharedAdminSession, runId),
+      result: await runSingleCase(testCase, config, runDir, memory, sharedSessions, runId),
       timedOut: false
     };
   }
 
   let timeout: NodeJS.Timeout | undefined;
   let timedOut = false;
-  const casePromise = runSingleCase(testCase, config, runDir, memory, sharedAdminSession, runId);
+  const casePromise = runSingleCase(testCase, config, runDir, memory, sharedSessions, runId);
   const timeoutPromise = new Promise<CaseResult>((resolve) => {
     timeout = setTimeout(() => {
       timedOut = true;
@@ -184,74 +187,78 @@ async function runSingleCase(
   config: RuntimeConfig,
   runDir: string,
   memory: ExecutionMemory,
-  sharedAdminSession: SharedAdminSession,
+  sharedSessions: SharedSiteSessions,
   runId: string
 ): Promise<CaseResult> {
-  if (testCase.site === "admin") {
-    const missing = missingAdminEnv(config);
+  const missing = missingSiteEnv(config, testCase.site);
 
-    if (missing.length > 0) {
-      return {
-        run_id: runId,
-        case_execution_id: caseExecutionId(runId, testCase.stable_id),
-        stable_id: testCase.stable_id,
-        title: testCase.title,
-        status: "ENV_BLOCKED",
-        precondition_result: "Not checked because Admin Site environment is not configured.",
-        actual_result: "The agent did not open staging.",
-        expected_result: testCase.expected_result,
-        failure_reason: `Missing required environment variable(s): ${missing.join(", ")}.`,
-        created_test_data: [],
-        depends_on_data: [],
-        traceability: buildNotExecutedTrace(
-          testCase,
-          "Environment/authentication configuration blocked execution before browser actions."
-        ),
-        notes: [
-          "Fill .env from .env.example before running browser execution.",
-          "This is an environment/setup block, not a product bug."
-        ]
-      };
-    }
+  if (missing.length > 0) {
+    return {
+      run_id: runId,
+      case_execution_id: caseExecutionId(runId, testCase.stable_id),
+      stable_id: testCase.stable_id,
+      title: testCase.title,
+      status: "ENV_BLOCKED",
+      precondition_result: `Not checked because ${testCase.site} environment is not configured.`,
+      actual_result: "The agent did not open staging.",
+      expected_result: testCase.expected_result,
+      failure_reason: `Missing required environment variable(s): ${missing.join(", ")}.`,
+      created_test_data: [],
+      depends_on_data: [],
+      traceability: buildNotExecutedTrace(
+        testCase,
+        "Environment/authentication configuration blocked execution before browser actions."
+      ),
+      notes: [
+        "Fill .env from .env.example before running browser execution.",
+        "This is an environment/setup block, not a product bug."
+      ]
+    };
+  }
 
-    if (sharedAdminSession.error) {
-      return sessionBlockedResult(testCase, sharedAdminSession.error, runId);
-    }
+  const siteError = sharedSessions.errors[testCase.site];
+  if (siteError) {
+    return sessionBlockedResult(testCase, siteError, runId);
   }
 
   const r6Result = await executeR6MasterCampaignCase(testCase, config, runDir, memory, runId, {
-    adminSession: sharedAdminSession.session
+    adminSession: sharedSessions.sessions.admin
   });
   if (r6Result) {
     return r6Result;
   }
 
   return runDynamicCase(testCase, config, runDir, runId, {
-    adminSession: sharedAdminSession.session
+    adminSession: sharedSessions.sessions.admin,
+    siteSession: sharedSessions.sessions[testCase.site]
   });
 }
 
-interface SharedAdminSession {
-  session?: AdminPageSession;
-  error?: unknown;
+interface SharedSiteSessions {
+  sessions: Partial<Record<Site, AdminPageSession>>;
+  errors: Partial<Record<Site, unknown>>;
 }
 
-async function openSharedAdminSession(
+async function openSharedSiteSessions(
   cases: NormalizedCase[],
   config: RuntimeConfig
-): Promise<SharedAdminSession> {
-  const shouldOpenAdminSession =
-    cases.some((testCase) => testCase.site === "admin") && missingAdminEnv(config).length === 0;
+): Promise<SharedSiteSessions> {
+  const sessions: Partial<Record<Site, AdminPageSession>> = {};
+  const errors: Partial<Record<Site, unknown>> = {};
+  const sites = Array.from(new Set(cases.map((testCase) => testCase.site)));
 
-  if (!shouldOpenAdminSession) {
-    return {};
+  for (const site of sites) {
+    const shouldOpenSession = missingSiteEnv(config, site).length === 0;
+    if (!shouldOpenSession) continue;
+
+    try {
+      sessions[site] = await openSitePage(config, site);
+    } catch (error) {
+      errors[site] = error;
+    }
   }
 
-  try {
-    return { session: await openAdminPage(config) };
-  } catch (error) {
-    return { error };
-  }
+  return { sessions, errors };
 }
 
 function sessionBlockedResult(
@@ -270,8 +277,8 @@ function sessionBlockedResult(
     status,
     precondition_result:
       status === "ENV_BLOCKED"
-        ? "Environment/authentication blocked the shared Admin browser session."
-        : "The shared Admin browser session could not be opened before case execution.",
+        ? `Environment/authentication blocked the shared ${testCase.site} browser session.`
+        : `The shared ${testCase.site} browser session could not be opened before case execution.`,
     actual_result: "No browser actions were executed for this case.",
     expected_result: testCase.expected_result,
     failure_reason: message,

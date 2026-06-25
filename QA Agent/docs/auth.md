@@ -28,10 +28,22 @@ QA_ADMIN_LOGIN_URL=
 QA_ADMIN_USERNAME=
 QA_ADMIN_PASSWORD=
 QA_ADMIN_VERIFICATION_CODE=
+QA_CREATOR_BASE_URL=
+QA_CREATOR_LOGIN_URL=
+QA_CREATOR_USERNAME=
+QA_CREATOR_PASSWORD=
+QA_CREATOR_VERIFICATION_CODE=
+QA_AGENCY_BASE_URL=
+QA_AGENCY_LOGIN_URL=
+QA_AGENCY_USERNAME=
+QA_AGENCY_PASSWORD=
+QA_AGENCY_VERIFICATION_CODE=
 QA_HEADLESS=true
 ```
 
 `QA Agent/src/runtime/config.ts` reads `QA Agent/.env` first and then falls back to `../.env`.
+
+Admin, Creator, and Agency credentials must stay in local `.env` only. Browser execution opens a shared session for each site that appears in the selected cases and has complete local configuration.
 
 ## Storage State
 
@@ -39,9 +51,11 @@ After a successful login, the agent writes:
 
 ```text
 QA Agent/storage-state/admin.json
+QA Agent/storage-state/creator.json
+QA Agent/storage-state/agency.json
 ```
 
-This file lets later runs reuse the logged-in Admin Site session. It is intentionally ignored by git because it may contain cookies or localStorage tokens.
+These files let later runs reuse logged-in site sessions. They are intentionally ignored by git because they may contain cookies or localStorage tokens.
 
 ## Running With Verification Code
 

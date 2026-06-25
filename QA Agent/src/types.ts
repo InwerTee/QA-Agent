@@ -9,6 +9,8 @@ export type QaStatus =
   | "ENV_BLOCKED"
   | "MANUAL_REVIEW";
 
+export type ResultConfidence = "high" | "medium" | "low";
+
 export type AutomationStatus = "ready" | "needs_mapping" | "manual_review";
 export type TriagePriority = "P0" | "P1" | "P2" | "P3";
 export type TriageReadiness = "implemented" | "candidate" | "needs_fixture" | "manual_review";
@@ -154,6 +156,8 @@ export interface CaseResult {
   stable_id: string;
   title: string;
   status: QaStatus;
+  result_confidence?: ResultConfidence;
+  classification_reason?: string;
   precondition_result: string;
   actual_result: string;
   expected_result: string[];

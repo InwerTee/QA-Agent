@@ -4,7 +4,7 @@
 
 最终使用方式应该很简单:同事把本次 release 的 PRD 和测试用例交给 agent,agent 读取、执行,然后输出结果报告。它不应该依赖本地 `参考文档/` 文件夹。
 
-第一版目标很小:先支持 R6 Master Campaign 的真实 test case workbook ingestion,并继续让三条试点 case 跑出清楚的 actual vs expected、状态、失败原因和最小 evidence。它不是完整 QA 平台,不接 Jam。当前会处理上传 workbook 中解析出的全部 case,但只有已经接入 executor 的 case 会实际执行 UI 自动化;其他 case 会以 blocked/review 方式进入报告和 Paragon Excel 复制件。
+第一版目标很小:先证明真实 Paragon test case workbook ingestion、浏览器执行、actual vs expected、结果回填和最小 evidence 这条链路能跑通。R6 Master Campaign 只是开发样例,不是长期架构中心。它不是完整 QA 平台,不接 Jam。当前会处理上传 workbook 中解析出的全部 case:已知流程可以走静态 executor,其他 case 会进入 dynamic runner,先做 case understanding 和页面探索,再尝试通用 Playwright 操作。
 
 当前的 `inputs/R6/` 是从本地 R6 input package 生成出来的开发样例。它的作用是先证明:
 
@@ -44,6 +44,8 @@ src/
   cases/                    # case 读取与过滤
   core/                     # setup plan 与判断类型
   ingestion/                # PRD / Excel 输入包解析
+  understanding/            # v0.9 case understanding 与 Gro module 识别
+  dynamic/                  # 通用 Playwright action plan / page discovery / target resolver
   triage/                   # case 自动化优先级和 executor 归类
   runner/                   # 执行调度
   reporting/                # JSON/Markdown 报告
@@ -128,7 +130,7 @@ http://127.0.0.1:4173
 
 不要直接双击或打开 `src/web/static/index.html`。这个页面需要本地 Node server 提供 `/api/run`,所以直接用 `file://` 打开会无法提交运行。
 
-页面支持上传 PRD PDF、Paragon test case `.xlsx`,可选填写一个本地 `Run label`,点击 Run 后等待结果。`Run label` 只是方便识别本次运行的名字,不会决定 case id 或 executor 匹配;agent 会从上传的测试用例内容和文件名推断 release。完成后可以下载 filled Excel / report,也可以打开结果文件夹。网页默认会处理上传文件中解析出的全部 case;有 executor 的会执行,没有 executor 的也会写入报告和 Excel 结果列。
+前端页面打开后,用户只需要上传本次 release 的 PRD PDF 和 Paragon test case `.xlsx`,然后点击 Run 等待结果。`Run label` 是可选的本地备注,不会决定 case id 或 executor 匹配;agent 会从上传的测试用例内容和文件名推断 release。完成后可以下载 filled Excel / report,也可以打开结果文件夹。网页默认会处理上传文件中解析出的全部 case;有 executor 的会执行,没有 executor 的也会写入报告和 Excel 结果列。
 
 网页运行采用本地 job 轮询模式:提交后 `/api/run` 会先返回 job id,页面再轮询 `/api/run-status/<job-id>` 显示当前阶段、当前 case、完成数量和实时 summary。单条 case 默认最多执行 90 秒,可用 `QA_CASE_TIMEOUT_MS` 调整;超时会标记为 `AGENT_BLOCKED`,不会被当成 Gro 产品 bug。
 
@@ -163,6 +165,8 @@ reports/runs/<run-id>/result_mapping.json
 - `source.workbook` / `sheet` / `source_row`
 
 静态 shortcut / 历史 executor 如果存在,必须有 traceability contract,声明每条原始 step / expected result 被哪个自动化动作或断言覆盖。v0.8 起,没有静态 shortcut 的 case 会进入 dynamic runner,由通用 browser agent loop 尝试理解和执行。
+
+v0.9 增加了 General Gro Understanding Layer。每条 case 在执行前会被理解成结构化信息:目标 site、module、business object、action、precondition、expected assertion 和 required capability。Admin / Creator / Agency case 会按目标 site 使用对应本地配置和 storage state,再根据 module registry 尝试候选 route、菜单探索和通用动作执行。具体 case 仍可能因为缺少前置测试数据、有效邀请链接、验证码或更强断言能力而被标记为 blocked / manual review。
 
 如果 `.env` 还没有配置 staging URL 和账号,`run` 会生成 `ENV_BLOCKED` 报告,不会假装执行成功。
 
@@ -199,7 +203,7 @@ R6 三条 pilot case 现在已经接到 Playwright executor:
 - `R6-B7.1-TC01`: 使用上一条创建出的 Master Campaign 作为前置数据,搜索并验证列表结果。
 - `R6-B7.3-TC01`: 使用上一条创建出的 Master Campaign,从列表 Operation column 打开 Edit 弹窗,编辑 Brief Description,保存后打开详情页验证更新后的描述。
 
-同一轮 `qa run` 会复用一个 Admin browser session。这样 `create -> search -> edit` 可以共享登录态和页面上下文,避免每条 case 都重新启动/关闭浏览器。case 之间仍通过 report 中的 test data lineage 显式记录依赖关系。
+同一轮 `qa run` 会按 site 复用共享 browser session。这样 Admin / Creator / Agency 各自可以共享登录态和页面上下文,避免每条 case 都重新启动/关闭浏览器。case 之间仍通过 report 中的 test data lineage 显式记录依赖关系。
 
 执行器参考了历史实现里已经验证过的 Gro UI 惯例,包括:
 
@@ -257,6 +261,16 @@ QA_ADMIN_USERNAME=
 QA_ADMIN_PASSWORD=
 QA_ADMIN_VERIFICATION_CODE=
 QA_ADMIN_STORAGE_STATE=
+QA_CREATOR_BASE_URL=
+QA_CREATOR_LOGIN_URL=
+QA_CREATOR_USERNAME=
+QA_CREATOR_PASSWORD=
+QA_CREATOR_STORAGE_STATE=
+QA_AGENCY_BASE_URL=
+QA_AGENCY_LOGIN_URL=
+QA_AGENCY_USERNAME=
+QA_AGENCY_PASSWORD=
+QA_AGENCY_STORAGE_STATE=
 QA_HEADLESS=true
 ```
 

@@ -75,6 +75,12 @@ export function formatMarkdownReport(report: RunReport): string {
     lines.push(`## ${result.stable_id} - ${result.title}`);
     lines.push("");
     lines.push(`- Status: ${result.status}`);
+    if (result.result_confidence) {
+      lines.push(`- Result confidence: ${result.result_confidence}`);
+    }
+    if (result.classification_reason) {
+      lines.push(`- Classification reason: ${result.classification_reason}`);
+    }
     lines.push(`- Case execution ID: ${result.case_execution_id}`);
     lines.push(`- Precondition result: ${result.precondition_result}`);
     lines.push(`- Actual result: ${result.actual_result}`);

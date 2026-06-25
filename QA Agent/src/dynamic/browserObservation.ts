@@ -307,8 +307,7 @@ async function readTables(page: Page): Promise<TableSnapshot[]> {
         const sampleRows = rows.slice(0, 5).map((row) =>
           Array.from(row.querySelectorAll("td"))
             .map((cell) => compactInBrowser((cell as HTMLElement).innerText || cell.textContent || ""))
-            .filter(Boolean)
-            .slice(0, 10)
+            .slice(0, 30)
         );
 
         return {

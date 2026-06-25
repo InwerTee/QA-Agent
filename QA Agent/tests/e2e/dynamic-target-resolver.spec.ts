@@ -1,8 +1,10 @@
 import { expect, test } from "@playwright/test";
 import {
   rankElementCandidates,
+  resolveSelectTarget,
   type RankedTargetCandidate
 } from "../../src/dynamic/targetResolver.js";
+import type { Page } from "@playwright/test";
 import type { ElementCandidate, InputCandidate } from "../../src/dynamic/browserObservation.js";
 
 test("target resolver ranks icon and class hints for filter controls", () => {
@@ -61,6 +63,32 @@ test("target resolver keeps similarly ranked candidates visible for ambiguity ha
   expect(ranked[0].score).toBe(ranked[1].score);
 });
 
+test("target resolver finds labeled select controls inside drawers", async ({ page }) => {
+  await page.setContent(`
+    <div class="el-drawer">
+      <div class="el-drawer__body">
+        <div class="el-form-item">
+          <label class="el-form-item__label">Platform</label>
+          <div class="el-select">
+            <input class="el-input__inner" placeholder="Select" />
+          </div>
+        </div>
+      </div>
+    </div>
+  `);
+
+  const resolution = await resolveSelectTarget(page as Page, emptyObservation(), {
+    action: "select",
+    target: "Platform dropdown",
+    value: "TikTok"
+  });
+
+  expect(resolution.status).toBe("found");
+  if (resolution.status === "found") {
+    expect(resolution.reason).toContain("form label match: Platform");
+  }
+});
+
 function label(candidate: RankedTargetCandidate): string {
   const element = candidate.candidate;
   return [
@@ -104,5 +132,18 @@ function inputCandidate(input: Partial<InputCandidate>): InputCandidate {
     }),
     value: "",
     ...input
+  };
+}
+
+function emptyObservation() {
+  return {
+    url: "about:blank",
+    title: "",
+    visibleTextSample: "",
+    buttons: [],
+    clickables: [],
+    inputs: [],
+    tableHeaders: [],
+    tables: []
   };
 }

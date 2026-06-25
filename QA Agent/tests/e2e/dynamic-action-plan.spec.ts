@@ -75,6 +75,22 @@ test("dynamic action plan treats wait with Enter as a trigger instead of a fill 
   expect(plan.steps[0]).not.toHaveProperty("value");
 });
 
+test("dynamic action plan treats menu navigation as page discovery instead of a raw click", () => {
+  const plan = buildDynamicActionPlan(
+    fakeCase({
+      steps: ['Navigate to the "Creator Menu" and click on "Creator Account" section.'],
+      expectedResult: ["Creator Account page is displayed."]
+    })
+  );
+
+  expect(plan.steps[0]).toEqual(
+    expect.objectContaining({
+      action: "navigate",
+      target: "Creator Account"
+    })
+  );
+});
+
 test("dynamic action plan does not treat typed values as field targets", () => {
   const plan = buildDynamicActionPlan(
     fakeCase({
@@ -104,6 +120,55 @@ test("dynamic action plan normalizes pagination symbols into named controls", ()
     expect.objectContaining({
       action: "click",
       target: "Next"
+    })
+  );
+});
+
+test("dynamic action plan parses filter field colon option syntax", () => {
+  const plan = buildDynamicActionPlan(
+    fakeCase({
+      steps: ["User sets Platform: TikTok, Instagram in the filter."],
+      expectedResult: ["The table displays only matching creators."]
+    })
+  );
+
+  expect(plan.steps[0]).toEqual(
+    expect.objectContaining({
+      action: "select",
+      target: "Platform dropdown",
+      value: "TikTok, Instagram"
+    })
+  );
+});
+
+test("dynamic action plan parses unquoted selection values", () => {
+  const plan = buildDynamicActionPlan(
+    fakeCase({
+      steps: ["User selects In Progress in the Status dropdown."],
+      expectedResult: ["Only In Progress rows are shown."]
+    })
+  );
+
+  expect(plan.steps[0]).toEqual(
+    expect.objectContaining({
+      action: "select",
+      target: "Status dropdown",
+      value: "In Progress"
+    })
+  );
+});
+
+test("dynamic action plan does not treat noun phrase types of filters as typing", () => {
+  const plan = buildDynamicActionPlan(
+    fakeCase({
+      steps: ["Apply all three types of filters at once."],
+      expectedResult: ["The table displays records that match all selected filters."]
+    })
+  );
+
+  expect(plan.steps[0]).toEqual(
+    expect.objectContaining({
+      action: "observe"
     })
   );
 });

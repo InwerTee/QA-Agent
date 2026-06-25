@@ -3,6 +3,7 @@ import path from "node:path";
 import readXlsxFile from "read-excel-file/node";
 import type { CellValue, Row, Sheet } from "read-excel-file/node";
 import type { AutomationStatus, CaseDependency, NormalizedCase, Site } from "../types.js";
+import { inferModuleNameFromText } from "../understanding/caseUnderstanding.js";
 
 interface PrepareOptions {
   release?: string;
@@ -30,15 +31,20 @@ interface InputFiles {
 
 interface HeaderMap {
   no: number;
-  scenario: number;
+  scenario?: number;
   testCase: number;
   precondition: number;
-  steps: number;
+  steps: StepColumn[];
   expected: number;
-  type: number;
+  type?: number;
   status?: number;
   evidence?: number;
   note?: number;
+}
+
+interface StepColumn {
+  index: number;
+  label: string;
 }
 
 interface ParsedWorkbook {
@@ -50,7 +56,7 @@ interface ParsedWorkbook {
 }
 
 const HEADER_ALIASES: Record<keyof HeaderMap, string[]> = {
-  no: ["no", "number"],
+  no: ["no", "number", "id", "case id", "test case id"],
   scenario: ["scenario"],
   testCase: ["testcase", "test case"],
   precondition: ["prerequisite", "pre requisite", "precondition", "pre condition"],
@@ -58,8 +64,8 @@ const HEADER_ALIASES: Record<keyof HeaderMap, string[]> = {
   expected: ["expectedresult", "expected result", "expected"],
   type: ["type"],
   status: ["status"],
-  evidence: ["evidence"],
-  note: ["note", "notes"]
+  evidence: ["evidence", "result", "actual result", "jam", "jam link"],
+  note: ["note", "notes", "bugs detail", "bug detail", "bugs"]
 };
 
 export async function prepareInputPackage(
@@ -148,10 +154,10 @@ async function parseWorkbook(workbookPath: string): Promise<ParsedWorkbook> {
   const sheets = (await readXlsxFile(workbookPath)) as Sheet[];
   const candidate = sheets
     .map((sheet) => {
-      const headerRowIndex = findHeaderRow(sheet.data);
-      return { sheet, headerRowIndex };
+      const header = findHeader(sheet.data);
+      return { sheet, header };
     })
-    .filter((item) => item.headerRowIndex >= 0)
+    .filter((item): item is { sheet: Sheet; header: HeaderCandidate } => Boolean(item.header))
     .sort((a, b) => b.sheet.data.length - a.sheet.data.length)[0];
 
   if (!candidate) {
@@ -161,9 +167,9 @@ async function parseWorkbook(workbookPath: string): Promise<ParsedWorkbook> {
   return {
     sheet: candidate.sheet.sheet,
     rows: candidate.sheet.data,
-    headerRowIndex: candidate.headerRowIndex,
-    headerMap: buildHeaderMap(candidate.sheet.data[candidate.headerRowIndex]),
-    metadata: extractMetadata(candidate.sheet.data, candidate.headerRowIndex)
+    headerRowIndex: candidate.header.headerRowIndex,
+    headerMap: candidate.header.headerMap,
+    metadata: extractMetadata(candidate.sheet.data, candidate.header.headerRowIndex)
   };
 }
 
@@ -175,6 +181,9 @@ function parseCases(
   const cases: NormalizedCase[] = [];
   let currentGroup = "Ungrouped";
   let currentGroupCode = "G0";
+  const groupCodes = new Map<string, string>();
+  const caseCountByGroupCode = new Map<string, number>();
+  let generatedGroupCount = 0;
 
   for (let index = workbook.headerRowIndex + 1; index < workbook.rows.length; index += 1) {
     const row = workbook.rows[index];
@@ -182,26 +191,52 @@ function parseCases(
 
     if (groupName) {
       currentGroup = groupName;
-      currentGroupCode = extractGroupCode(groupName);
+      const existing = groupCodes.get(groupName);
+      if (existing) {
+        currentGroupCode = existing;
+      } else {
+        generatedGroupCount += 1;
+        currentGroupCode = extractGroupCode(groupName, generatedGroupCount);
+        groupCodes.set(groupName, currentGroupCode);
+      }
       continue;
     }
 
-    const caseNo = toCaseNo(row[workbook.headerMap.no]);
     const title = cellToString(row[workbook.headerMap.testCase]);
 
-    if (!caseNo || !title) {
+    if (!title) {
       continue;
     }
 
+    const parsedCaseNo = toCaseNo(row[workbook.headerMap.no]);
+    const inlineGroupName = parsedCaseNo === undefined
+      ? extractInlineGroupName(row, workbook.headerMap)
+      : undefined;
+    if (inlineGroupName) {
+      currentGroup = inlineGroupName;
+      const existing = groupCodes.get(inlineGroupName);
+      if (existing) {
+        currentGroupCode = existing;
+      } else {
+        generatedGroupCount += 1;
+        currentGroupCode = extractGroupCode(inlineGroupName, generatedGroupCount);
+        groupCodes.set(inlineGroupName, currentGroupCode);
+      }
+    }
+
+    const generatedCaseNo = (caseCountByGroupCode.get(currentGroupCode) ?? 0) + 1;
+    const caseNo = parsedCaseNo ?? generatedCaseNo;
+    caseCountByGroupCode.set(currentGroupCode, Math.max(generatedCaseNo, caseNo));
+
     const stableId = `${release}-${currentGroupCode}-TC${String(caseNo).padStart(2, "0")}`;
-    const scenario = cellToString(row[workbook.headerMap.scenario]);
-    const precondition = normalizeText(cellToString(row[workbook.headerMap.precondition]));
-    const rawPrecondition = cellToString(row[workbook.headerMap.precondition]);
-    const rawSteps = cellToString(row[workbook.headerMap.steps]);
+    const scenario = inferScenario(row, workbook.headerMap, currentGroup);
+    const rawPrecondition = readPrecondition(row, workbook.headerMap);
+    const precondition = normalizeText(rawPrecondition);
+    const rawSteps = readStepText(row, workbook.headerMap);
     const rawExpected = cellToString(row[workbook.headerMap.expected]);
-    const steps = splitList(cellToString(row[workbook.headerMap.steps]));
+    const steps = splitSteps(row, workbook.headerMap);
     const expectedResult = splitList(cellToString(row[workbook.headerMap.expected]));
-    const rawType = cellToString(row[workbook.headerMap.type]);
+    const rawType = getOptionalCell(row, workbook.headerMap.type) ?? "";
     const sourceNote = getOptionalCell(row, workbook.headerMap.note);
     const dependencies = inferDependencies(stableId, currentGroupCode, precondition, title, release);
 
@@ -215,7 +250,7 @@ function parseCases(
       scenario,
       title,
       site: inferSite(`${currentGroup} ${scenario} ${title} ${precondition}`),
-      module: inferModule(`${currentGroup} ${scenario} ${title}`),
+      module: inferModule(`${currentGroup} ${scenario} ${title} ${precondition} ${rawSteps} ${rawExpected}`),
       type: rawType || "Unspecified",
       intent: inferIntent(scenario, title),
       precondition,
@@ -246,49 +281,109 @@ function parseCases(
   return cases;
 }
 
-function findHeaderRow(rows: Row[]): number {
-  return rows.findIndex((row) => {
-    const values = row.map((cell) => normalizeKey(cellToString(cell)));
-    return (
-      values.includes("no") &&
-      values.includes("scenario") &&
-      values.includes("testcase") &&
-      values.includes("expectedresult")
-    );
-  });
+interface HeaderCandidate {
+  headerRowIndex: number;
+  headerMap: HeaderMap;
 }
 
-function buildHeaderMap(row: Row): HeaderMap {
+function findHeader(rows: Row[]): HeaderCandidate | undefined {
+  for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+    const headerMap = buildHeaderMap(rows[rowIndex], rows[rowIndex + 1]);
+    if (headerMap) {
+      return { headerRowIndex: rowIndex, headerMap };
+    }
+  }
+
+  return undefined;
+}
+
+function buildHeaderMap(row: Row, subHeaderRow?: Row): HeaderMap | undefined {
   const getIndex = (key: keyof HeaderMap): number | undefined => {
     const aliases = HEADER_ALIASES[key].map(normalizeKey);
     const index = row.findIndex((cell) => aliases.includes(normalizeKey(cellToString(cell))));
     return index >= 0 ? index : undefined;
   };
+  const getExactIndex = (aliases: string[]): number | undefined => {
+    const normalizedAliases = aliases.map(normalizeKey);
+    const index = row.findIndex((cell) =>
+      normalizedAliases.includes(normalizeKey(cellToString(cell)))
+    );
+    return index >= 0 ? index : undefined;
+  };
 
-  const required: Array<keyof HeaderMap> = [
-    "no",
-    "scenario",
-    "testCase",
-    "precondition",
-    "steps",
-    "expected",
-    "type"
-  ];
-  const map: Partial<HeaderMap> = {};
+  const no = getIndex("no");
+  const testCase = getIndex("testCase");
+  const combinedPreconditionSteps = getExactIndex([
+    "pre requisite & test steps",
+    "pre-requisite & test steps",
+    "pre requisite and test steps",
+    "precondition & test steps",
+    "preconditions & test steps",
+    "preconditions and test steps"
+  ]);
+  const precondition = getIndex("precondition") ?? combinedPreconditionSteps;
+  const stepsStart = getIndex("steps") ?? combinedPreconditionSteps;
+  const expected = getIndex("expected");
 
-  for (const key of required) {
-    const index = getIndex(key);
-    if (index === undefined) {
-      throw new Error(`Missing required test case column: ${key}`);
-    }
-    map[key] = index;
+  if (
+    no === undefined ||
+    testCase === undefined ||
+    precondition === undefined ||
+    stepsStart === undefined ||
+    expected === undefined
+  ) {
+    return undefined;
   }
 
-  map.status = getIndex("status");
-  map.evidence = getIndex("evidence");
-  map.note = getIndex("note");
+  const steps = buildStepColumns(row, subHeaderRow, stepsStart, expected);
+  if (steps.length === 0) return undefined;
 
-  return map as HeaderMap;
+  const map: HeaderMap = {
+    no,
+    scenario: getIndex("scenario"),
+    testCase,
+    precondition,
+    steps,
+    expected,
+    type: getIndex("type"),
+    status: getIndex("status"),
+    evidence: getExactIndex(["evidence", "jam", "jam link"]) ?? getIndex("evidence"),
+    note: getIndex("note")
+  };
+
+  return map;
+}
+
+function buildStepColumns(
+  row: Row,
+  subHeaderRow: Row | undefined,
+  stepsStart: number,
+  expectedIndex: number
+): StepColumn[] {
+  const subHeaderKeys = (subHeaderRow ?? []).map((cell) => normalizeKey(cellToString(cell)));
+  const hasStepSubHeaders = subHeaderKeys.some((key) =>
+    ["what", "when", "where", "why", "who", "how"].includes(key)
+  );
+
+  if (!hasStepSubHeaders || expectedIndex <= stepsStart) {
+    return [
+      {
+        index: stepsStart,
+        label: cellToString(row[stepsStart]) || "Test Steps"
+      }
+    ];
+  }
+
+  const columns: StepColumn[] = [];
+  for (let index = stepsStart; index < expectedIndex; index += 1) {
+    const label =
+      cellToString(subHeaderRow?.[index]) ||
+      cellToString(row[index]) ||
+      (index === stepsStart ? "Test Steps" : `Step ${index - stepsStart + 1}`);
+    columns.push({ index, label });
+  }
+
+  return columns;
 }
 
 function extractMetadata(rows: Row[], headerRowIndex: number): Record<string, string> {
@@ -327,18 +422,34 @@ function extractGroupName(row: Row): string | undefined {
   if (nonEmpty.length !== 1) return undefined;
 
   const [value] = nonEmpty;
-  return /^B\d+(?:\.\d+)?\b/i.test(value) ? value : undefined;
+  if (/^(id|no|test case|scenario|prerequisite|test steps|expected result)$/i.test(value)) {
+    return undefined;
+  }
+  if (/^\d+$/i.test(value)) return undefined;
+  return value;
 }
 
-function extractGroupCode(groupName: string): string {
+function extractInlineGroupName(row: Row, headerMap: HeaderMap): string | undefined {
+  if (headerMap.scenario === undefined) return undefined;
+
+  const value = cellToString(row[headerMap.scenario]);
+  if (!value) return undefined;
+
+  const normalized = normalizeKey(value);
+  if (["scenario", "testcase", "testcase"].includes(normalized)) return undefined;
+  return value;
+}
+
+function extractGroupCode(groupName: string, fallbackIndex: number): string {
   const match = groupName.match(/^B\d+(?:\.\d+)?/i);
-  return match ? match[0].toUpperCase() : "G0";
+  return match ? match[0].toUpperCase() : `G${fallbackIndex}`;
 }
 
 export function inferRelease(metadata: Record<string, string>, fallbacks: string[]): string {
   const text = `${metadata.release ?? ""} ${metadata.requirementname ?? ""} ${fallbacks.join(" ")}`;
-  const match = text.match(/\bR\d+(?:\.\d+)?\b/i);
-  return match ? match[0].toUpperCase() : fallbacks[0].replace(/\W+/g, "-");
+  const matches = [...text.matchAll(/\bR\d+(?:\.\d+)?\b/gi)].map((match) => match[0]);
+  const [bestMatch] = matches.sort((a, b) => b.length - a.length);
+  return bestMatch ? bestMatch.toUpperCase() : fallbacks[0].replace(/\W+/g, "-");
 }
 
 function inferTitle(metadata: Record<string, string>, release: string): string {
@@ -347,10 +458,7 @@ function inferTitle(metadata: Record<string, string>, release: string): string {
 }
 
 function inferModule(text: string): string {
-  if (/master campaign/i.test(text)) return "Master Campaign";
-  if (/campaign/i.test(text)) return "Campaign";
-  if (/creator/i.test(text)) return "Creator";
-  return "Unknown";
+  return inferModuleNameFromText(text);
 }
 
 function inferSite(text: string): Site {
@@ -413,14 +521,96 @@ function inferAutomationStatus(
   return "needs_mapping";
 }
 
+function inferScenario(row: Row, headerMap: HeaderMap, currentGroup: string): string {
+  if (headerMap.scenario !== undefined) {
+    const scenario = cellToString(row[headerMap.scenario]);
+    if (scenario) return scenario;
+  }
+
+  const whatColumn = headerMap.steps.find((column) => normalizeKey(column.label) === "what");
+  if (whatColumn) {
+    const what = cellToString(row[whatColumn.index]);
+    if (what) return what;
+  }
+
+  return currentGroup;
+}
+
+function splitSteps(row: Row, headerMap: HeaderMap): string[] {
+  if (usesCombinedPreconditionAndSteps(headerMap)) {
+    const combined = cellToString(row[headerMap.steps[0].index]);
+    const stepText = extractStepsFromCombinedCell(combined);
+    const parsed = splitList(stepText);
+    return parsed.length > 0 ? parsed : splitList(combined);
+  }
+
+  const howColumn = headerMap.steps.find((column) => normalizeKey(column.label) === "how");
+  const primary = howColumn
+    ? cellToString(row[howColumn.index])
+    : cellToString(row[headerMap.steps[0]?.index]);
+  const primarySteps = splitList(primary);
+
+  if (primarySteps.length > 0) {
+    return primarySteps;
+  }
+
+  return splitList(readLabeledCells(row, headerMap.steps));
+}
+
+function readPrecondition(row: Row, headerMap: HeaderMap): string {
+  const value = cellToString(row[headerMap.precondition]);
+  if (!usesCombinedPreconditionAndSteps(headerMap)) {
+    return value;
+  }
+
+  return extractPreconditionFromCombinedCell(value);
+}
+
+function readStepText(row: Row, headerMap: HeaderMap): string {
+  if (!usesCombinedPreconditionAndSteps(headerMap)) {
+    return readLabeledCells(row, headerMap.steps);
+  }
+
+  const combined = cellToString(row[headerMap.steps[0].index]);
+  return extractStepsFromCombinedCell(combined) || combined;
+}
+
+function usesCombinedPreconditionAndSteps(headerMap: HeaderMap): boolean {
+  return headerMap.steps.length === 1 && headerMap.precondition === headerMap.steps[0].index;
+}
+
+function extractPreconditionFromCombinedCell(value: string): string {
+  const match = value.match(/(?:pre-?\s*conditions?|pre\s*requisite)\s*:\s*([\s\S]*?)(?=\bsteps?\s*:|$)/i);
+  return normalizeText(match?.[1] ?? value);
+}
+
+function extractStepsFromCombinedCell(value: string): string {
+  const match = value.match(/\bsteps?\s*:\s*([\s\S]*)/i);
+  return normalizeText(match?.[1] ?? value);
+}
+
+function readLabeledCells(row: Row, columns: StepColumn[]): string {
+  if (columns.length === 1) {
+    return cellToString(row[columns[0].index]);
+  }
+
+  return columns
+    .map((column) => {
+      const value = cellToString(row[column.index]);
+      return value ? `${column.label}: ${value}` : "";
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
 function splitList(value: string): string[] {
   const normalized = normalizeText(value);
   if (!normalized) return [];
 
   const parts = normalized
-    .replace(/\s*(\d+)\.\s*/g, "\n$1. ")
+    .replace(/\s*(\d+)[.)]\s*/g, "\n$1. ")
     .split(/\n+/)
-    .map((part) => part.replace(/^\d+\.\s*/, "").trim())
+    .map((part) => part.replace(/^\d+[.)]\s*/, "").trim())
     .filter(Boolean);
 
   return parts.length > 0 ? parts : [normalized];

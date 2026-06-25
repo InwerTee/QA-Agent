@@ -80,6 +80,7 @@ export function buildDynamicActionPlan(testCase: NormalizedCase): DynamicActionP
 function inferActionStep(text: string): Omit<DynamicActionStep, "index" | "source" | "sourceText"> {
   const normalized = normalizeText(text);
   const quoted = quotedTexts(normalized);
+  const filterSelection = inferFilterSelection(normalized);
 
   if (/\b(wait|refresh|trigger|load)\b/i.test(normalized)) {
     return {
@@ -97,6 +98,15 @@ function inferActionStep(text: string): Omit<DynamicActionStep, "index" | "sourc
     };
   }
 
+  if (/\bnavigate\s+to\b/i.test(normalized) && /\b(menu|page|section)\b/i.test(normalized)) {
+    return {
+      action: "navigate",
+      target: inferNavigationTarget(normalized),
+      reason: "The step asks the user to reach a page or menu section; page discovery handles the actual navigation.",
+      confidence: "medium"
+    };
+  }
+
   if (isFillInstruction(normalized)) {
     return {
       action: "fill",
@@ -107,13 +117,23 @@ function inferActionStep(text: string): Omit<DynamicActionStep, "index" | "sourc
     };
   }
 
-  if (/\b(selects?|chooses?|picks?)\b/i.test(normalized)) {
+  if (filterSelection) {
+    return {
+      action: "select",
+      target: filterSelection.target,
+      value: filterSelection.value,
+      reason: "The step describes a filter field and option value using field: option syntax.",
+      confidence: "medium"
+    };
+  }
+
+  if (/\b(selects?|chooses?|picks?|sets?|filters?\s+by)\b/i.test(normalized)) {
     return {
       action: "select",
       target: inferSelectionTarget(normalized) ?? inferTargetAfter(normalized, ["in", "from"]) ?? inferFieldTarget(normalized),
-      value: quoted[0],
+      value: quoted[0] ?? inferSelectionValue(normalized),
       reason: "The step asks the user to select an option.",
-      confidence: quoted[0] ? "medium" : "low"
+      confidence: quoted[0] || inferSelectionValue(normalized) ? "medium" : "low"
     };
   }
 
@@ -154,6 +174,14 @@ function inferPageTarget(text: string): string | undefined {
   return match?.[1]?.trim();
 }
 
+function inferNavigationTarget(text: string): string | undefined {
+  const quoted = quotedTexts(text);
+  if (quoted.length > 0) return quoted[quoted.length - 1];
+
+  const match = text.match(/\bnavigate\s+to\s+(.+?)(?:\.|$)/i);
+  return match?.[1]?.trim();
+}
+
 function inferFieldTarget(text: string): string | undefined {
   const quoted = quotedTexts(text);
   if (/search/i.test(text)) return "Search";
@@ -173,11 +201,61 @@ function inferAssertionTarget(text: string): string | undefined {
 }
 
 function inferSelectionTarget(text: string): string | undefined {
+  const filterSelection = inferFilterSelection(text);
+  if (filterSelection) return filterSelection.target;
+
   const inTheMatch = text.match(/\bin the\s+(.+?),\s*user\s+selects?/i);
   if (inTheMatch?.[1]) return cleanupSelectionTarget(inTheMatch[1]);
 
   const dropdownMatch = text.match(/\bin the\s+(.+?\bdropdown\b)/i);
   if (dropdownMatch?.[1]) return cleanupSelectionTarget(dropdownMatch[1]);
+
+  return undefined;
+}
+
+function inferSelectionValue(text: string): string | undefined {
+  const filterSelection = inferFilterSelection(text);
+  if (filterSelection) return filterSelection.value;
+
+  const selectInMatch = text.match(/\b(?:selects?|chooses?|picks?)\s+(.+?)\s+in\s+the\s+.+?\bdropdown\b/i);
+  if (selectInMatch?.[1]) return cleanupSelectionValue(selectInMatch[1]);
+
+  const selectFromMatch = text.match(/\b(?:selects?|chooses?|picks?)\s+(.+?)\s+from\s+the\s+.+?\bdropdown\b/i);
+  if (selectFromMatch?.[1]) return cleanupSelectionValue(selectFromMatch[1]);
+
+  const toMatch = text.match(/\b(?:to|as)\s+(.+?)(?:\.|$)/i);
+  if (toMatch?.[1]) return cleanupSelectionValue(toMatch[1]);
+
+  const optionMatch = text.match(/\boption\s+(.+?)(?:\.|$)/i);
+  if (optionMatch?.[1]) return cleanupSelectionValue(optionMatch[1]);
+
+  return undefined;
+}
+
+function inferFilterSelection(text: string): { target: string; value: string } | undefined {
+  const filterScope = /\b(filter|dropdown|select|option|criteria|platform|status|type|account|source|campaign)\b/i.test(text);
+  if (!filterScope) return undefined;
+
+  const colonText = text
+    .replace(/\buser\s+(?:sets?|selects?|chooses?|picks?|filters?\s+by|inputs?|enters?)\s+/i, "")
+    .replace(/\bin\s+the\s+filter\b\.?$/i, "")
+    .trim();
+
+  const colonMatch = colonText.match(/\b([A-Z][A-Za-z0-9 /&()_-]{1,40})\s*:\s*([^.;]+)(?:[.;]|$)/);
+  if (colonMatch?.[1] && colonMatch[2]) {
+    return {
+      target: cleanupSelectionTarget(`${colonMatch[1]} dropdown`),
+      value: cleanupSelectionValue(colonMatch[2])
+    };
+  }
+
+  const lowerColonMatch = colonText.match(/\b(platform|status|account type|creator source|bind type|campaign type)\s*:\s*([^.;]+)(?:[.;]|$)/i);
+  if (lowerColonMatch?.[1] && lowerColonMatch[2]) {
+    return {
+      target: cleanupSelectionTarget(`${lowerColonMatch[1]} dropdown`),
+      value: cleanupSelectionValue(lowerColonMatch[2])
+    };
+  }
 
   return undefined;
 }
@@ -192,7 +270,8 @@ function inferFillTarget(text: string): string | undefined {
 }
 
 function isFillInstruction(text: string): boolean {
-  if (/\b(types?|enters?|fills?)\b/i.test(text)) return true;
+  if (/\b(enters?|fills?|typed|typing|filled)\b/i.test(text)) return true;
+  if (/\btypes?\b/i.test(text) && !/\btypes?\s+of\b/i.test(text)) return true;
   return /\binputs?\s+(?:"[^"]+"|'[^']+'|\d+)/i.test(text);
 }
 
@@ -233,6 +312,17 @@ function cleanupSelectionTarget(value: string): string {
   return cleanupTarget(value)
     .replace(/^(master campaign|campaign|filter)\s+/i, "")
     .replace(/\s*\((multi[- ]?select|multiselect)\)\s*$/i, " dropdown")
+    .replace(/\s+(field|filter|select|selection)$/i, " dropdown")
+    .trim();
+}
+
+function cleanupSelectionValue(value: string): string {
+  return value
+    .replace(/\b(and|or)\b/gi, ",")
+    .replace(/[)"']+$/g, "")
+    .replace(/^["'(]+/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/,$/, "")
     .trim();
 }
 

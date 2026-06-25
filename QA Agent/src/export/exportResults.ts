@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import type {
   CaseResult,
   QaStatus,
+  ResultConfidence,
   RunReport,
   TraceCoverageSummary
 } from "../types.js";
@@ -50,6 +51,8 @@ export interface ResultMappingCase {
   source_row: number;
   raw_test_case: string;
   run_status: QaStatus;
+  result_confidence?: ResultConfidence;
+  classification_reason?: string;
   coverage_summary: TraceCoverageSummary;
   final_filled_status: FilledResultStatus;
   actual_result: string;
@@ -127,6 +130,8 @@ export async function exportResultsToWorkbook(
         source_row: caseResult.traceability.source_row,
         raw_test_case: caseResult.traceability.raw_test_case,
         run_status: caseResult.status,
+        result_confidence: caseResult.result_confidence,
+        classification_reason: caseResult.classification_reason,
         coverage_summary: caseResult.traceability.coverage_summary,
         final_filled_status: finalStatus,
         actual_result: caseResult.actual_result,

@@ -37,6 +37,8 @@ v0.7 增加本地 HTML Wrapper:用户运行 `npm run qa:web`,浏览器打开 `ht
 
 v0.8 开始转向 Dynamic Playwright Agent Loop:没有预写脚本的 case 不应该直接退出。agent 会根据上传 case 的 precondition / steps / expected result 生成临时动作计划,用 Playwright 观察页面、尝试通用动作,并在卡住时返回 `Agent Blocked`、具体步骤、页面观察和 evidence。静态 shortcut 只作为已知流程的加速路径,不是运行前提。
 
+v0.9 增加 General Gro Understanding Layer:agent 不再只问“这条 case 有没有 executor”,而是先理解“这条 case 想验证什么”。每条 case 会被解析成目标 site、module、business object、action、precondition、expected assertion 和 required capability。Admin / Creator / Agency case 会按目标 site 使用对应共享 browser session,再根据 module registry 尝试候选 route 和菜单探索,并给页面匹配评分;如果是全新模块或缺少前置数据,agent 也应该先记录理解结果、探索过的页面、缺失的 capability,再给出 `Agent Blocked`、`Setup Blocked` 或 `Manual Review`,而不是简单报错。
+
 ## 正式输入
 
 建议未来每次运行输入一个 input package:

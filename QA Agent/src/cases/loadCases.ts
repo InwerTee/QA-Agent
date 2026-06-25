@@ -42,8 +42,7 @@ function validateCase(testCase: NormalizedCase): NormalizedCase {
     "title",
     "site",
     "module",
-    "intent",
-    "precondition"
+    "intent"
   ];
 
   for (const key of requiredStrings) {
@@ -52,7 +51,7 @@ function validateCase(testCase: NormalizedCase): NormalizedCase {
     }
   }
 
-  if (!Array.isArray(testCase.steps) || testCase.steps.length === 0) {
+  if (!Array.isArray(testCase.steps)) {
     throw new Error(`Invalid case ${testCase.stable_id}: missing steps`);
   }
 
