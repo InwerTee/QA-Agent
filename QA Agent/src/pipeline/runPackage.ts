@@ -9,7 +9,7 @@ import {
   type PrepareResult
 } from "../ingestion/prepareInputPackage.js";
 import { loadRuntimeConfig } from "../runtime/config.js";
-import { runCases } from "../runner/runCases.js";
+import { runCases, type RunCasesProgress } from "../runner/runCases.js";
 import { triageRelease, type TriageResult } from "../triage/triageCases.js";
 import type { AutomationMap, CaseTriage, NormalizedCase, RunReport } from "../types.js";
 
@@ -17,6 +17,16 @@ export interface RunPackageOptions {
   release?: string;
   outDir?: string;
   caseIds?: string[];
+  caseTimeoutMs?: number;
+  onProgress?: (progress: RunPackageProgress) => void;
+}
+
+export interface RunPackageProgress {
+  phase: "preparing" | "triaging" | "running" | "exporting" | "completed";
+  message: string;
+  release?: string;
+  selectedCaseIds?: string[];
+  run?: RunCasesProgress;
 }
 
 export interface RunPackageResult {
@@ -38,11 +48,21 @@ export async function runInputPackage(
   inputDir: string,
   options: RunPackageOptions = {}
 ): Promise<RunPackageResult> {
+  options.onProgress?.({
+    phase: "preparing",
+    message: "Preparing uploaded PRD and test cases."
+  });
   const prepared = await prepareInputPackage(inputDir, {
     release: options.release,
     outDir: options.outDir
   });
   const cases = await loadCasesFromFile(prepared.casesPath);
+
+  options.onProgress?.({
+    phase: "triaging",
+    release: prepared.release,
+    message: `Triaging ${cases.length} parsed case(s).`
+  });
   const triage = await triageRelease(prepared.release, cases, { outDir: prepared.outDir });
   const selectedCases = selectCasesForPackageRun(cases, options.caseIds, triage.automationMap);
 
@@ -50,16 +70,65 @@ export async function runInputPackage(
     throw new Error("No test cases were found for this input package.");
   }
 
-  const runResult = await runCases(prepared.release, selectedCases, loadRuntimeConfig());
+  const selectedCaseIds = selectedCases.map((testCase) => testCase.stable_id);
+  options.onProgress?.({
+    phase: "running",
+    release: prepared.release,
+    selectedCaseIds,
+    message: `Running ${selectedCases.length} selected case(s).`
+  });
+  const runResult = await runCases(prepared.release, selectedCases, loadRuntimeConfig(), {
+    caseTimeoutMs: options.caseTimeoutMs,
+    onProgress: (run) =>
+      options.onProgress?.({
+        phase: "running",
+        release: prepared.release,
+        selectedCaseIds,
+        message: run.message,
+        run
+      })
+  });
+
+  options.onProgress?.({
+    phase: "exporting",
+    release: prepared.release,
+    selectedCaseIds,
+    run: {
+      stage: "completed",
+      runId: runResult.report.run_id,
+      release: prepared.release,
+      total: selectedCases.length,
+      completed: runResult.report.case_results.length,
+      summary: runResult.report.summary,
+      message: "Exporting filled Excel workbook."
+    },
+    message: "Exporting filled Excel workbook."
+  });
   const exportResult = await exportResultsToWorkbook(runResult.jsonPath);
+
+  options.onProgress?.({
+    phase: "completed",
+    release: prepared.release,
+    selectedCaseIds,
+    run: {
+      stage: "completed",
+      runId: runResult.report.run_id,
+      release: prepared.release,
+      total: selectedCases.length,
+      completed: runResult.report.case_results.length,
+      summary: runResult.report.summary,
+      message: "Run package completed."
+    },
+    message: "Run package completed."
+  });
 
   return {
     release: prepared.release,
     inputDir: path.resolve(inputDir),
     prepared,
     triage,
-    selectedCaseIds: selectedCases.map((testCase) => testCase.stable_id),
-    processedCaseIds: selectedCases.map((testCase) => testCase.stable_id),
+    selectedCaseIds,
+    processedCaseIds: selectedCaseIds,
     report: runResult.report,
     reportJsonPath: runResult.jsonPath,
     reportMarkdownPath: runResult.markdownPath,

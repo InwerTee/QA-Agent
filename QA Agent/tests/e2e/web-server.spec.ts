@@ -11,7 +11,9 @@ test("local web runner page exposes the minimal upload workflow", async () => {
   expect(html).toContain("accept=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xlsx\"");
   expect(html).toContain("Run QA Agent");
   expect(html).toContain("Run label");
-  expect(html).toContain("The agent will infer the release");
+  expect(html).toContain("Run progress");
+  expect(html).toContain("Running cases");
+  expect(html).toContain("/api/run-status/");
   expect(html).toContain("Inferred release");
   expect(html).toContain("Download filled Excel");
   expect(html).toContain("Open result folder");

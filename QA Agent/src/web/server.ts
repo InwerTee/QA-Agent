@@ -5,7 +5,11 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { runInputPackage, type RunPackageResult } from "../pipeline/runPackage.js";
+import {
+  runInputPackage,
+  type RunPackageProgress,
+  type RunPackageResult
+} from "../pipeline/runPackage.js";
 
 const DEFAULT_PORT = 4173;
 const MAX_BODY_BYTES = 80 * 1024 * 1024;
@@ -53,14 +57,37 @@ interface JsonResponse {
   };
 }
 
+interface WebRunJob {
+  jobId: string;
+  status: "running" | "done" | "error";
+  createdAt: string;
+  updatedAt: string;
+  message: string;
+  progress?: RunPackageProgress;
+  result?: JsonResponse;
+  error?: string;
+}
+
+interface JobStatusResponse {
+  status: "running" | "done" | "error";
+  jobId: string;
+  createdAt: string;
+  updatedAt: string;
+  message: string;
+  progress?: RunPackageProgress;
+  result?: JsonResponse;
+  error?: string;
+}
+
 let activeRun = false;
 
 export function createWebServer(): Server {
   const records = new Map<string, WebRunRecord>();
+  const jobs = new Map<string, WebRunJob>();
 
   return createServer(async (request, response) => {
     try {
-      await routeRequest(request, response, records);
+      await routeRequest(request, response, records, jobs);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       sendJson(response, 500, { error: message });
@@ -92,7 +119,8 @@ export async function startWebServer(port = readPort()): Promise<Server> {
 async function routeRequest(
   request: IncomingMessage,
   response: ServerResponse,
-  records: Map<string, WebRunRecord>
+  records: Map<string, WebRunRecord>,
+  jobs: Map<string, WebRunJob>
 ): Promise<void> {
   const method = request.method ?? "GET";
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -108,7 +136,13 @@ async function routeRequest(
   }
 
   if (method === "POST" && url.pathname === "/api/run") {
-    await handleRun(request, response, records);
+    await handleRun(request, response, records, jobs);
+    return;
+  }
+
+  const statusMatch = url.pathname.match(/^\/api\/run-status\/([^/]+)$/);
+  if (method === "GET" && statusMatch) {
+    handleRunStatus(response, jobs, statusMatch[1]);
     return;
   }
 
@@ -130,35 +164,89 @@ async function routeRequest(
 async function handleRun(
   request: IncomingMessage,
   response: ServerResponse,
-  records: Map<string, WebRunRecord>
+  records: Map<string, WebRunRecord>,
+  jobs: Map<string, WebRunJob>
 ): Promise<void> {
   if (activeRun) {
     sendJson(response, 409, { error: "Another QA Agent run is already in progress." });
     return;
   }
 
+  let payload: RunRequestPayload;
+  try {
+    payload = validateRunPayload(await readJsonBody<RunRequestPayload>(request));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    sendJson(response, 400, { error: message });
+    return;
+  }
+
   activeRun = true;
 
   try {
-    let payload: RunRequestPayload;
-    try {
-      payload = validateRunPayload(await readJsonBody<RunRequestPayload>(request));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      sendJson(response, 400, { error: message });
-      return;
-    }
-
     const inputDir = await writeInputPackage(payload);
+    const now = new Date().toISOString();
+    const job: WebRunJob = {
+      jobId: randomUUID(),
+      status: "running",
+      createdAt: now,
+      updatedAt: now,
+      message: "Run accepted. Preparing uploaded files."
+    };
+
+    jobs.set(job.jobId, job);
+    void executeWebRun(job, inputDir, records);
+
+    sendJson(response, 202, buildJobStatusResponse(job));
+  } catch (error) {
+    activeRun = false;
+    throw error;
+  }
+}
+
+function handleRunStatus(
+  response: ServerResponse,
+  jobs: Map<string, WebRunJob>,
+  jobId: string
+): void {
+  const job = jobs.get(jobId);
+  if (!job) {
+    sendJson(response, 404, { error: "Run job not found in this local server session." });
+    return;
+  }
+
+  sendJson(response, 200, buildJobStatusResponse(job));
+}
+
+async function executeWebRun(
+  job: WebRunJob,
+  inputDir: string,
+  records: Map<string, WebRunRecord>
+): Promise<void> {
+  try {
     const result = await runInputPackage(inputDir, {
-      outDir: path.join(inputDir, "generated-inputs")
+      outDir: path.join(inputDir, "generated-inputs"),
+      onProgress: (progress) => updateJobProgress(job, progress)
     });
     const record = registerRun(records, result);
-
-    sendJson(response, 200, buildRunResponse(result, record));
+    job.status = "done";
+    job.result = buildRunResponse(result, record);
+    job.message = `Run ${record.runId} completed.`;
+    job.updatedAt = new Date().toISOString();
+  } catch (error) {
+    job.status = "error";
+    job.error = error instanceof Error ? error.message : String(error);
+    job.message = "QA Agent run failed.";
+    job.updatedAt = new Date().toISOString();
   } finally {
     activeRun = false;
   }
+}
+
+function updateJobProgress(job: WebRunJob, progress: RunPackageProgress): void {
+  job.progress = progress;
+  job.message = progress.message;
+  job.updatedAt = new Date().toISOString();
 }
 
 async function handleDownload(
@@ -237,6 +325,19 @@ function buildRunResponse(result: RunPackageResult, record: WebRunRecord): JsonR
     actions: {
       openResultFolder: `/api/open-folder/${encodeURIComponent(record.runId)}`
     }
+  };
+}
+
+function buildJobStatusResponse(job: WebRunJob): JobStatusResponse {
+  return {
+    status: job.status,
+    jobId: job.jobId,
+    createdAt: job.createdAt,
+    updatedAt: job.updatedAt,
+    message: job.message,
+    progress: job.progress,
+    result: job.result,
+    error: job.error
   };
 }
 

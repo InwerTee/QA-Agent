@@ -11,7 +11,15 @@ import type {
 const require = createRequire(import.meta.url);
 const XlsxPopulate = require("xlsx-populate") as XlsxPopulateModule;
 
-export type FilledResultStatus = "Passed" | "Partial" | "Failed" | "Blocked" | "Review";
+export type FilledResultStatus =
+  | "Passed"
+  | "Partial"
+  | "Failed"
+  | "Setup Blocked"
+  | "Agent Blocked"
+  | "Script Blocked"
+  | "Env Blocked"
+  | "Review";
 
 export interface ExportResultsOptions {
   sourceWorkbook?: string;
@@ -153,9 +161,13 @@ export function deriveFilledStatus(caseResult: CaseResult): FilledResultStatus {
     case "PRODUCT_BUG":
       return "Failed";
     case "SETUP_BLOCKED":
+      return "Setup Blocked";
+    case "AGENT_BLOCKED":
+      return "Agent Blocked";
     case "SCRIPT_BLOCKED":
+      return "Script Blocked";
     case "ENV_BLOCKED":
-      return "Blocked";
+      return "Env Blocked";
     case "MANUAL_REVIEW":
       return "Review";
   }

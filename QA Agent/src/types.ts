@@ -4,6 +4,7 @@ export type QaStatus =
   | "PASS"
   | "PRODUCT_BUG"
   | "SETUP_BLOCKED"
+  | "AGENT_BLOCKED"
   | "SCRIPT_BLOCKED"
   | "ENV_BLOCKED"
   | "MANUAL_REVIEW";

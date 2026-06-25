@@ -1,10 +1,11 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { missingAdminEnv, type RuntimeConfig } from "../runtime/config.js";
-import type { CaseResult, ExecutionMemory, NormalizedCase, RunReport } from "../types.js";
+import type { CaseResult, ExecutionMemory, NormalizedCase, QaStatus, RunReport } from "../types.js";
 import { caseExecutionId } from "../core/runIdentity.js";
 import { formatMarkdownReport, summarize } from "../reporting/formatReport.js";
 import { executeR6MasterCampaignCase } from "../executors/r6MasterCampaign.js";
+import { runDynamicCase } from "../dynamic/dynamicCaseRunner.js";
 import { buildNotExecutedTrace } from "../traceability/caseTraceability.js";
 import {
   closeAdminPage,
@@ -13,10 +14,34 @@ import {
   type AdminPageSession
 } from "../playwright/adminSession.js";
 
+export interface RunCasesProgress {
+  stage: "started" | "case_started" | "case_completed" | "completed";
+  runId: string;
+  release: string;
+  total: number;
+  completed: number;
+  currentCase?: ProgressCase;
+  completedCase?: ProgressCase & { status: QaStatus };
+  summary: Record<QaStatus, number>;
+  message: string;
+}
+
+export interface ProgressCase {
+  stable_id: string;
+  title: string;
+  index: number;
+}
+
+export interface RunCasesOptions {
+  onProgress?: (progress: RunCasesProgress) => void;
+  caseTimeoutMs?: number;
+}
+
 export async function runCases(
   release: string,
   cases: NormalizedCase[],
-  config: RuntimeConfig
+  config: RuntimeConfig,
+  options: RunCasesOptions = {}
 ): Promise<{ report: RunReport; jsonPath: string; markdownPath: string }> {
   const runId = createRunId(release);
   const startedAt = new Date().toISOString();
@@ -27,12 +52,61 @@ export async function runCases(
   const results: CaseResult[] = [];
   const memory: ExecutionMemory = {};
   const sharedAdminSession = await openSharedAdminSession(cases, config);
+  const emitProgress = (progress: Omit<RunCasesProgress, "runId" | "release" | "total" | "summary">) => {
+    options.onProgress?.({
+      runId,
+      release,
+      total: cases.length,
+      summary: summarize(results),
+      ...progress
+    });
+  };
+
+  emitProgress({
+    stage: "started",
+    completed: 0,
+    message: `Starting ${cases.length} case(s).`
+  });
 
   try {
-    for (const testCase of cases) {
-      results.push(
-        await runSingleCase(testCase, config, runDir, memory, sharedAdminSession, runId)
+    for (const [index, testCase] of cases.entries()) {
+      const progressCase = toProgressCase(testCase, index);
+      emitProgress({
+        stage: "case_started",
+        completed: results.length,
+        currentCase: progressCase,
+        message: `Running ${testCase.stable_id}.`
+      });
+
+      const { result, timedOut } = await runSingleCaseWithTimeout(
+        testCase,
+        config,
+        runDir,
+        memory,
+        sharedAdminSession,
+        runId,
+        options.caseTimeoutMs ?? config.caseTimeoutMs
       );
+      results.push(result);
+
+      if (timedOut && sharedAdminSession.session) {
+        await closeAdminPage(sharedAdminSession.session);
+        sharedAdminSession.session = undefined;
+        sharedAdminSession.error = new QaBlockedError(
+          "SCRIPT_BLOCKED",
+          `The shared Admin browser session was closed after ${testCase.stable_id} exceeded the case timeout.`
+        );
+      }
+
+      emitProgress({
+        stage: "case_completed",
+        completed: results.length,
+        completedCase: {
+          ...progressCase,
+          status: result.status
+        },
+        message: `Completed ${testCase.stable_id}: ${result.status}.`
+      });
     }
   } finally {
     if (sharedAdminSession.session) {
@@ -57,7 +131,52 @@ export async function runCases(
   await writeFile(jsonPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
   await writeFile(markdownPath, formatMarkdownReport(report), "utf8");
 
+  emitProgress({
+    stage: "completed",
+    completed: results.length,
+    message: `Completed ${results.length}/${cases.length} case(s).`
+  });
+
   return { report, jsonPath, markdownPath };
+}
+
+async function runSingleCaseWithTimeout(
+  testCase: NormalizedCase,
+  config: RuntimeConfig,
+  runDir: string,
+  memory: ExecutionMemory,
+  sharedAdminSession: SharedAdminSession,
+  runId: string,
+  timeoutMs: number
+): Promise<{ result: CaseResult; timedOut: boolean }> {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    return {
+      result: await runSingleCase(testCase, config, runDir, memory, sharedAdminSession, runId),
+      timedOut: false
+    };
+  }
+
+  let timeout: NodeJS.Timeout | undefined;
+  let timedOut = false;
+  const casePromise = runSingleCase(testCase, config, runDir, memory, sharedAdminSession, runId);
+  const timeoutPromise = new Promise<CaseResult>((resolve) => {
+    timeout = setTimeout(() => {
+      timedOut = true;
+      resolve(caseTimeoutResult(testCase, runId, timeoutMs));
+    }, timeoutMs);
+  });
+
+  const result = await Promise.race([casePromise, timeoutPromise]);
+
+  if (timeout) {
+    clearTimeout(timeout);
+  }
+
+  if (timedOut) {
+    casePromise.catch(() => undefined);
+  }
+
+  return { result, timedOut };
 }
 
 async function runSingleCase(
@@ -107,27 +226,9 @@ async function runSingleCase(
     return r6Result;
   }
 
-  return {
-    run_id: runId,
-    case_execution_id: caseExecutionId(runId, testCase.stable_id),
-    stable_id: testCase.stable_id,
-    title: testCase.title,
-    status: "SCRIPT_BLOCKED",
-    precondition_result: "Environment is configured, but no Playwright executor has been implemented for this case yet.",
-    actual_result: "No browser actions were executed.",
-    expected_result: testCase.expected_result,
-    failure_reason: `Missing case executor for ${testCase.stable_id}.`,
-    created_test_data: [],
-    depends_on_data: [],
-    traceability: buildNotExecutedTrace(
-      testCase,
-      `No Playwright executor has been implemented for ${testCase.stable_id}.`
-    ),
-    notes: [
-      "Next step: implement selectors and browser actions for this stable case id.",
-      "Do not mark this as a Gro product bug."
-    ]
-  };
+  return runDynamicCase(testCase, config, runDir, runId, {
+    adminSession: sharedAdminSession.session
+  });
 }
 
 interface SharedAdminSession {
@@ -188,6 +289,36 @@ function sessionBlockedResult(
   };
 }
 
+function caseTimeoutResult(
+  testCase: NormalizedCase,
+  runId: string,
+  timeoutMs: number
+): CaseResult {
+  const seconds = Math.round(timeoutMs / 1000);
+
+  return {
+    run_id: runId,
+    case_execution_id: caseExecutionId(runId, testCase.stable_id),
+    stable_id: testCase.stable_id,
+    title: testCase.title,
+    status: "AGENT_BLOCKED",
+    precondition_result: "The case exceeded the configured execution timeout.",
+    actual_result: `The agent stopped this case after ${seconds} seconds to keep the run from hanging.`,
+    expected_result: testCase.expected_result,
+    failure_reason: `Case timeout exceeded (${seconds}s).`,
+    created_test_data: [],
+    depends_on_data: [],
+    traceability: buildNotExecutedTrace(
+      testCase,
+      `Execution stopped because QA_CASE_TIMEOUT_MS was reached (${timeoutMs} ms).`
+    ),
+    notes: [
+      "This timeout is an agent/runtime guard, not a Gro product result.",
+      "Increase QA_CASE_TIMEOUT_MS if this case legitimately needs more time."
+    ]
+  };
+}
+
 function collectCreatedTestData(results: CaseResult[]) {
   const byId = new Map<string, CaseResult["created_test_data"][number]>();
 
@@ -203,4 +334,12 @@ function collectCreatedTestData(results: CaseResult[]) {
 function createRunId(release: string): string {
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   return `${release}-${timestamp}`;
+}
+
+function toProgressCase(testCase: NormalizedCase, index: number): ProgressCase {
+  return {
+    stable_id: testCase.stable_id,
+    title: testCase.title,
+    index: index + 1
+  };
 }

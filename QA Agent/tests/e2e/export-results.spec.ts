@@ -33,7 +33,10 @@ test("filled result status separates execution pass from full coverage", () => {
   expect(deriveFilledStatus(fakeCase("PASS", fullCoverage()))).toBe("Passed");
   expect(deriveFilledStatus(fakeCase("PASS", partialCoverage()))).toBe("Partial");
   expect(deriveFilledStatus(fakeCase("PRODUCT_BUG", fullCoverage()))).toBe("Failed");
-  expect(deriveFilledStatus(fakeCase("SCRIPT_BLOCKED", fullCoverage()))).toBe("Blocked");
+  expect(deriveFilledStatus(fakeCase("SETUP_BLOCKED", fullCoverage()))).toBe("Setup Blocked");
+  expect(deriveFilledStatus(fakeCase("AGENT_BLOCKED", fullCoverage()))).toBe("Agent Blocked");
+  expect(deriveFilledStatus(fakeCase("SCRIPT_BLOCKED", fullCoverage()))).toBe("Script Blocked");
+  expect(deriveFilledStatus(fakeCase("ENV_BLOCKED", fullCoverage()))).toBe("Env Blocked");
   expect(deriveFilledStatus(fakeCase("MANUAL_REVIEW", fullCoverage()))).toBe("Review");
 });
 
@@ -183,6 +186,7 @@ function emptySummary(): Record<QaStatus, number> {
     PASS: 0,
     PRODUCT_BUG: 0,
     SETUP_BLOCKED: 0,
+    AGENT_BLOCKED: 0,
     SCRIPT_BLOCKED: 0,
     ENV_BLOCKED: 0,
     MANUAL_REVIEW: 0

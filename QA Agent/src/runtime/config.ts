@@ -14,6 +14,7 @@ export interface RuntimeConfig {
   storageTtlMs: number;
   headless: boolean;
   evidenceDir: string;
+  caseTimeoutMs: number;
 }
 
 export function loadRuntimeConfig(): RuntimeConfig {
@@ -27,7 +28,8 @@ export function loadRuntimeConfig(): RuntimeConfig {
     forceRelogin: readBool("QA_FORCE_RELOGIN"),
     storageTtlMs: Number(readEnv("QA_STORAGE_TTL_MS") ?? 24 * 60 * 60 * 1000),
     headless: readEnv("QA_HEADLESS") !== "false",
-    evidenceDir: readEnv("QA_EVIDENCE_DIR") ?? "reports/runs"
+    evidenceDir: readEnv("QA_EVIDENCE_DIR") ?? "reports/runs",
+    caseTimeoutMs: Number(readEnv("QA_CASE_TIMEOUT_MS") ?? 90_000)
   };
 }
 

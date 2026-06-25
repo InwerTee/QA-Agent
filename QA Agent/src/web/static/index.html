@@ -173,6 +173,64 @@
         background: #fff5f5;
       }
 
+      .progress {
+        display: none;
+        gap: 10px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 12px;
+        background: var(--surface-2);
+      }
+
+      .progress.visible {
+        display: grid;
+      }
+
+      .progress-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 14px;
+      }
+
+      .progress-count,
+      .progress-current {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .progress-track {
+        width: 100%;
+        height: 8px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #e5e7eb;
+      }
+
+      .progress-fill {
+        width: 0%;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--accent);
+        transition: width 180ms ease;
+      }
+
+      .progress-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .progress-chip {
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 3px 8px;
+        color: var(--muted);
+        background: var(--surface);
+        font-size: 12px;
+      }
+
       .results {
         display: none;
         gap: 14px;
@@ -186,7 +244,7 @@
 
       .summary {
         display: grid;
-        grid-template-columns: repeat(6, minmax(0, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
         gap: 8px;
       }
 
@@ -280,6 +338,18 @@
 
         <div id="status" class="status" role="status">Ready.</div>
 
+        <section id="progress" class="progress" aria-label="Run progress">
+          <div class="progress-head">
+            <strong id="progress-title">Preparing</strong>
+            <span id="progress-count" class="progress-count"></span>
+          </div>
+          <div class="progress-track" aria-hidden="true">
+            <div id="progress-fill" class="progress-fill"></div>
+          </div>
+          <div id="progress-current" class="progress-current"></div>
+          <div id="progress-summary" class="progress-summary"></div>
+        </section>
+
         <section id="results" class="results" aria-label="Run results">
           <div class="summary" id="summary"></div>
           <div class="actions">
@@ -296,6 +366,12 @@
       const form = document.getElementById("run-form");
       const runButton = document.getElementById("run-button");
       const statusBox = document.getElementById("status");
+      const progress = document.getElementById("progress");
+      const progressTitle = document.getElementById("progress-title");
+      const progressCount = document.getElementById("progress-count");
+      const progressFill = document.getElementById("progress-fill");
+      const progressCurrent = document.getElementById("progress-current");
+      const progressSummary = document.getElementById("progress-summary");
       const results = document.getElementById("results");
       const summary = document.getElementById("summary");
       const paths = document.getElementById("paths");
@@ -306,6 +382,7 @@
       const localServerUrl = "http://127.0.0.1:4173";
       const fileModeMessage = `This page must be opened from the local QA Agent server. Run npm run qa:web, then open ${localServerUrl}.`;
       let currentOpenFolderAction = null;
+      let activeJobId = null;
 
       if (window.location.protocol === "file:") {
         runButton.disabled = true;
@@ -336,7 +413,7 @@
         }
 
         runButton.disabled = true;
-        setStatus("Running. The agent will infer the release from the uploaded test cases.");
+        setStatus("Uploading files and starting the local runner.");
 
         try {
           const payload = {
@@ -355,8 +432,19 @@
             throw new Error(body.error || "QA Agent run failed.");
           }
 
-          renderResult(body);
-          setStatus(`Done. Run ${body.runId} completed.`, "success");
+          if (body.status === "running") {
+            renderJobStatus(body);
+            const completedJob = await pollJob(body.jobId);
+            if (!completedJob) return;
+            renderResult(completedJob.result);
+            setStatus(`Done. Run ${completedJob.result.runId} completed.`, "success");
+          } else if (body.status === "done" && body.result) {
+            renderResult(body.result);
+            setStatus(`Done. Run ${body.result.runId} completed.`, "success");
+          } else {
+            renderResult(body);
+            setStatus(`Done. Run ${body.runId} completed.`, "success");
+          }
         } catch (error) {
           setStatus(formatRunError(error), "error");
         } finally {
@@ -365,6 +453,7 @@
       });
 
       form.addEventListener("reset", () => {
+        activeJobId = null;
         clearResult();
         setStatus("Ready.");
       });
@@ -388,8 +477,70 @@
         };
       }
 
+      async function pollJob(jobId) {
+        activeJobId = jobId;
+
+        while (activeJobId === jobId) {
+          await sleep(1500);
+          const response = await fetch(`/api/run-status/${encodeURIComponent(jobId)}`);
+          const body = await response.json();
+
+          if (!response.ok) {
+            throw new Error(body.error || "Could not read run status.");
+          }
+
+          renderJobStatus(body);
+
+          if (body.status === "done") {
+            activeJobId = null;
+            if (!body.result) {
+              throw new Error("Run completed but no result payload was returned.");
+            }
+            return body;
+          }
+
+          if (body.status === "error") {
+            activeJobId = null;
+            throw new Error(body.error || body.message || "QA Agent run failed.");
+          }
+        }
+
+        return null;
+      }
+
+      function renderJobStatus(job) {
+        const packageProgress = job.progress || {};
+        const run = packageProgress.run || {};
+        const total = Number(run.total || 0);
+        const completed = Number(run.completed || 0);
+        const phase = packageProgress.phase || job.status || "running";
+        const percent = total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : 8;
+        const currentCase = run.currentCase;
+        const completedCase = run.completedCase;
+
+        progressTitle.textContent = phaseLabel(phase);
+        progressCount.textContent = total > 0 ? `${completed}/${total}` : "";
+        progressFill.style.width = `${percent}%`;
+        progressCurrent.textContent = currentCase
+          ? `Running ${currentCase.index}/${total}: ${currentCase.stable_id} - ${currentCase.title}`
+          : completedCase
+            ? `Completed ${completedCase.stable_id}: ${completedCase.status}`
+            : job.message || "Running.";
+        progressSummary.innerHTML = renderProgressSummary(run.summary);
+        progress.classList.add("visible");
+        setStatus(job.message || packageProgress.message || "Running.");
+      }
+
+      function renderProgressSummary(runSummary) {
+        if (!runSummary) return "";
+        const order = ["PASS", "PRODUCT_BUG", "SETUP_BLOCKED", "AGENT_BLOCKED", "SCRIPT_BLOCKED", "ENV_BLOCKED", "MANUAL_REVIEW"];
+        return order
+          .map((key) => `<span class="progress-chip">${key}: ${Number(runSummary[key] || 0)}</span>`)
+          .join("");
+      }
+
       function renderResult(result) {
-        const order = ["PASS", "PRODUCT_BUG", "SETUP_BLOCKED", "SCRIPT_BLOCKED", "ENV_BLOCKED", "MANUAL_REVIEW"];
+        const order = ["PASS", "PRODUCT_BUG", "SETUP_BLOCKED", "AGENT_BLOCKED", "SCRIPT_BLOCKED", "ENV_BLOCKED", "MANUAL_REVIEW"];
         summary.innerHTML = order
           .map((key) => {
             const value = result.summary[key] || 0;
@@ -414,6 +565,12 @@
       }
 
       function clearResult() {
+        progress.classList.remove("visible");
+        progressTitle.textContent = "Preparing";
+        progressCount.textContent = "";
+        progressFill.style.width = "0%";
+        progressCurrent.textContent = "";
+        progressSummary.innerHTML = "";
         results.classList.remove("visible");
         summary.innerHTML = "";
         paths.innerHTML = "";
@@ -437,6 +594,23 @@
           return `Could not reach the local QA Agent server. Keep npm run qa:web running, then open ${localServerUrl}.`;
         }
         return message;
+      }
+
+      function phaseLabel(phase) {
+        const labels = {
+          preparing: "Preparing input",
+          triaging: "Reading cases",
+          running: "Running cases",
+          exporting: "Exporting result",
+          completed: "Completed",
+          done: "Completed",
+          error: "Failed"
+        };
+        return labels[phase] || "Running";
+      }
+
+      function sleep(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
       }
 
       function escapeHtml(value) {
