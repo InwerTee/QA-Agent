@@ -4,7 +4,7 @@ import {
   resolveSelectTarget,
   type RankedTargetCandidate
 } from "../../src/dynamic/targetResolver.js";
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import type { ElementCandidate, InputCandidate } from "../../src/dynamic/browserObservation.js";
 
 test("target resolver ranks icon and class hints for filter controls", () => {
@@ -63,21 +63,8 @@ test("target resolver keeps similarly ranked candidates visible for ambiguity ha
   expect(ranked[0].score).toBe(ranked[1].score);
 });
 
-test("target resolver finds labeled select controls inside drawers", async ({ page }) => {
-  await page.setContent(`
-    <div class="el-drawer">
-      <div class="el-drawer__body">
-        <div class="el-form-item">
-          <label class="el-form-item__label">Platform</label>
-          <div class="el-select">
-            <input class="el-input__inner" placeholder="Select" />
-          </div>
-        </div>
-      </div>
-    </div>
-  `);
-
-  const resolution = await resolveSelectTarget(page as Page, emptyObservation(), {
+test("target resolver finds labeled select controls inside drawers", async () => {
+  const resolution = await resolveSelectTarget(fakePageWithDrawerControl(), emptyObservation(), {
     action: "select",
     target: "Platform dropdown",
     value: "TikTok"
@@ -146,4 +133,73 @@ function emptyObservation() {
     tableHeaders: [],
     tables: []
   };
+}
+
+function fakePageWithDrawerControl(): Page {
+  return {
+    locator(selector: string) {
+      if (selector.includes(".el-dialog__wrapper")) {
+        return fakeLocator({ visible: false });
+      }
+
+      if (selector.includes(".el-drawer")) {
+        return fakeLocator({ visible: true, role: "drawer" });
+      }
+
+      if (selector.includes(".el-popover")) {
+        return fakeLocator({ visible: false });
+      }
+
+      if (selector === "body") {
+        return fakeLocator({ visible: true, role: "body" });
+      }
+
+      return fakeLocator({ visible: false });
+    }
+  } as unknown as Page;
+}
+
+function fakeLocator(options: {
+  visible: boolean;
+  role?: "drawer" | "body" | "form-item" | "control-list" | "control";
+  count?: number;
+}): Locator {
+  const role = options.role ?? "control";
+  const locator = {
+    last() {
+      return locator;
+    },
+    first() {
+      return locator;
+    },
+    filter(_options: { hasText?: RegExp }) {
+      return locator;
+    },
+    locator(selector: string) {
+      if (role === "drawer" && selector.includes(".el-form-item")) {
+        return fakeLocator({ visible: true, role: "form-item" });
+      }
+
+      if (role === "form-item" && selector.includes("input")) {
+        return fakeLocator({ visible: true, role: "control-list", count: 1 });
+      }
+
+      return fakeLocator({ visible: false, count: 0 });
+    },
+    async isVisible(_options?: { timeout?: number }) {
+      return options.visible;
+    },
+    async count() {
+      return options.count ?? (options.visible ? 1 : 0);
+    },
+    nth(_index: number) {
+      if (role === "control-list") {
+        return fakeLocator({ visible: true, role: "control" });
+      }
+
+      return locator;
+    }
+  };
+
+  return locator as unknown as Locator;
 }

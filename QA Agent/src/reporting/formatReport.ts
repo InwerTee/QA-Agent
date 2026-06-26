@@ -1,8 +1,13 @@
 import { analyzeRunFailures } from "./failureAnalysis.js";
+import {
+  buildPilotCaseOutput,
+  pilotCategoryLabel
+} from "./pilotOutput.js";
 import type {
   CaseResult,
   ExecutionReadinessIssueCode,
   FailureCluster,
+  PilotFailureCategory,
   QaStatus,
   RunReport,
   TestCaseIRNode
@@ -16,6 +21,18 @@ const STATUS_ORDER: QaStatus[] = [
   "SCRIPT_BLOCKED",
   "ENV_BLOCKED",
   "MANUAL_REVIEW"
+];
+
+const PILOT_CATEGORY_ORDER: PilotFailureCategory[] = [
+  "product_bug",
+  "setup_data_issue",
+  "environment_issue",
+  "agent_understanding_gap",
+  "recipe_missing",
+  "selector_or_script_issue",
+  "test_case_ambiguity",
+  "manual_review_required",
+  "passed"
 ];
 
 export function summarize(results: CaseResult[]): Record<QaStatus, number> {
@@ -49,6 +66,29 @@ export function formatMarkdownReport(report: RunReport): string {
 
   for (const status of STATUS_ORDER) {
     lines.push(`| ${status} | ${report.summary[status]} |`);
+  }
+
+  if (report.pilot_output) {
+    lines.push("");
+    lines.push("## Pilot Output Summary");
+    lines.push("");
+    lines.push(`- Cases needing attention: ${report.pilot_output.attention_case_count}`);
+    lines.push("");
+    lines.push("| Failure Category | Count |");
+    lines.push("| --- | ---: |");
+    for (const category of PILOT_CATEGORY_ORDER) {
+      const count = report.pilot_output.by_category[category];
+      if (count > 0) {
+        lines.push(`| ${pilotCategoryLabel(category)} | ${count} |`);
+      }
+    }
+    if (report.pilot_output.top_recommended_actions.length > 0) {
+      lines.push("");
+      lines.push("Recommended next actions:");
+      for (const action of report.pilot_output.top_recommended_actions) {
+        lines.push(`- ${action}`);
+      }
+    }
   }
 
   if (report.prd_context) {
@@ -124,14 +164,15 @@ export function formatMarkdownReport(report: RunReport): string {
   lines.push("");
   lines.push("## Cases");
   lines.push("");
-  lines.push("| Case | Status | Actual | Failure Reason |");
-  lines.push("| --- | --- | --- | --- |");
+  lines.push("| Case | Status | Failure Category | What Happened | Recommended Action | Evidence |");
+  lines.push("| --- | --- | --- | --- | --- | --- |");
 
   for (const result of report.case_results) {
+    const pilotOutput = result.pilot_output ?? buildPilotCaseOutput(result);
     lines.push(
-      `| ${result.stable_id} | ${result.status} | ${oneLine(result.actual_result)} | ${oneLine(
-        result.failure_reason ?? ""
-      )} |`
+      `| ${result.stable_id} | ${result.status} | ${oneLine(pilotOutput.category_label)} | ${oneLine(
+        pilotOutput.developer_summary
+      )} | ${oneLine(pilotOutput.recommended_action)} | ${oneLine(pilotOutput.evidence_path ?? "")} |`
     );
   }
 
@@ -154,6 +195,11 @@ export function formatMarkdownReport(report: RunReport): string {
     lines.push(`## ${result.stable_id} - ${result.title}`);
     lines.push("");
     lines.push(`- Status: ${result.status}`);
+    const pilotOutput = result.pilot_output ?? buildPilotCaseOutput(result);
+    lines.push(`- Failure category: ${pilotOutput.category_label}`);
+    lines.push(`- Developer summary: ${pilotOutput.developer_summary}`);
+    lines.push(`- Recommended action: ${pilotOutput.recommended_action}`);
+    lines.push(`- Owner hint: ${pilotOutput.owner_hint}`);
     if (result.result_confidence) {
       lines.push(`- Result confidence: ${result.result_confidence}`);
     }

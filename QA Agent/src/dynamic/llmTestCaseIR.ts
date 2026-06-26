@@ -156,6 +156,7 @@ function buildOpenAIPayload(testCase: NormalizedCase, plan: DynamicActionPlan, m
             text: [
               "You translate Paragon QA test cases into a strict Test Case IR JSON object.",
               "Do not invent test steps, expected results, source indexes, or source text.",
+              "PRD context can clarify module, page, field, and action labels, but the original test case remains the execution authority.",
               "Every original test step must have at least one action node.",
               "Every original expected result must have at least one assertion node.",
               "If a step cannot be automated safely, map it to observe_only/manual rather than guessing.",
@@ -203,6 +204,7 @@ function buildOpenAIPayload(testCase: NormalizedCase, plan: DynamicActionPlan, m
                 stable_id: testCase.stable_id,
                 title: testCase.title,
                 goal: testCase.intent || testCase.title,
+                prd_context: testCase.prd_context,
                 source_workbook: testCase.source.workbook,
                 source_sheet: testCase.sheet,
                 source_row: testCase.source_row,

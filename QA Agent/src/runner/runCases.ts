@@ -7,6 +7,7 @@ import { summarizePrdKnowledge } from "../knowledge/prdKnowledge.js";
 import { caseExecutionId } from "../core/runIdentity.js";
 import { formatMarkdownReport, summarize } from "../reporting/formatReport.js";
 import { analyzeRunFailures } from "../reporting/failureAnalysis.js";
+import { attachPilotOutputs } from "../reporting/pilotOutput.js";
 import { executeR6MasterCampaignCase } from "../executors/r6MasterCampaign.js";
 import { runDynamicCase } from "../dynamic/dynamicCaseRunner.js";
 import {
@@ -132,22 +133,24 @@ export async function runCases(
   }
 
   const finishedAt = new Date().toISOString();
+  const jsonPath = path.join(runDir, "report.json");
+  const markdownPath = path.join(runDir, "report.md");
+  const resultsWithEvidence = addReportEvidenceFallbacks(results, markdownPath);
+  const pilotOutput = attachPilotOutputs(resultsWithEvidence);
   const report: RunReport = {
     run_id: runId,
     release,
     agent_version: AGENT_BUILD_LABEL,
     started_at: startedAt,
     finished_at: finishedAt,
-    case_results: results,
+    case_results: pilotOutput.results,
     prd_context: summarizePrdKnowledge(options.prdKnowledge),
     execution_readiness: summarizeExecutionReadiness(readinessResults.map((item) => item.decision)),
-    created_test_data: collectCreatedTestData(results),
-    summary: summarize(results),
-    failure_analysis: analyzeRunFailures(results)
+    pilot_output: pilotOutput.summary,
+    created_test_data: collectCreatedTestData(resultsWithEvidence),
+    summary: summarize(pilotOutput.results),
+    failure_analysis: analyzeRunFailures(pilotOutput.results)
   };
-
-  const jsonPath = path.join(runDir, "report.json");
-  const markdownPath = path.join(runDir, "report.md");
 
   await writeFile(jsonPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
   await writeFile(markdownPath, formatMarkdownReport(report), "utf8");
@@ -355,7 +358,7 @@ function readinessBlockedResult(
     title: testCase.title,
     status: decision.recommended_status,
     result_confidence: decision.confidence,
-    classification_reason: "Stopped by v0.20 conservative execution readiness gate.",
+    classification_reason: "Stopped by conservative execution readiness gate.",
     precondition_result: "Not checked because the case did not pass execution readiness.",
     actual_result: `No browser actions were executed. ${decision.reason}`,
     expected_result: testCase.expected_result,
@@ -417,6 +420,41 @@ function collectCreatedTestData(results: CaseResult[]) {
   }
 
   return Array.from(byId.values());
+}
+
+function addReportEvidenceFallbacks(results: CaseResult[], markdownPath: string): CaseResult[] {
+  return results.map((result) => {
+    if (result.evidence_path) return result;
+
+    const evidencePath = `${markdownPath}#${result.stable_id}`;
+    return {
+      ...result,
+      evidence_path: evidencePath,
+      traceability: addEvidenceToTrace(result.traceability, evidencePath),
+      notes: [
+        ...result.notes,
+        "No browser screenshot was available for this case; use the report case section as evidence."
+      ]
+    };
+  });
+}
+
+function addEvidenceToTrace(trace: CaseResult["traceability"], evidencePath: string): CaseResult["traceability"] {
+  return {
+    ...trace,
+    precondition_trace: trace.precondition_trace.map((entry) => ({
+      ...entry,
+      evidence_path: entry.evidence_path ?? evidencePath
+    })),
+    step_trace: trace.step_trace.map((entry) => ({
+      ...entry,
+      evidence_path: entry.evidence_path ?? evidencePath
+    })),
+    expected_trace: trace.expected_trace.map((entry) => ({
+      ...entry,
+      evidence_path: entry.evidence_path ?? evidencePath
+    }))
+  };
 }
 
 function createRunId(release: string): string {

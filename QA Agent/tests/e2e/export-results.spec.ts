@@ -40,7 +40,7 @@ test("filled result status separates execution pass from full coverage", () => {
   expect(deriveFilledStatus(fakeCase("MANUAL_REVIEW", fullCoverage()))).toBe("Review");
 });
 
-test("export-results fills one Agent Result column in a copied workbook", async () => {
+test("export-results fills pilot-readable result columns in a copied workbook", async () => {
   const tempDir = await mkdtemp(path.join(tmpdir(), "qa-export-results-"));
   const workbookPath = path.join(tempDir, "paragon.xlsx");
   const reportPath = path.join(tempDir, "report.json");
@@ -92,28 +92,57 @@ test("export-results fills one Agent Result column in a copied workbook", async 
       case_execution_id: string;
       stable_id: string;
       final_filled_status: string;
+      failure_category: string;
+      failure_summary: string;
+      recommended_action: string;
       filled_cell: string;
+      filled_cells: Record<string, string>;
     }>;
     result_column_by_sheet: Record<string, string>;
+    output_columns_by_sheet: Record<string, Record<string, string>>;
   };
 
   expect(filledSheet.cell(1, 4).value()).toBe("Agent Result");
+  expect(filledSheet.cell(1, 5).value()).toBe("Failure Category");
+  expect(filledSheet.cell(1, 6).value()).toBe("Failure Summary");
+  expect(filledSheet.cell(1, 7).value()).toBe("Recommended Action");
+  expect(filledSheet.cell(1, 8).value()).toBe("Evidence");
   expect(filledSheet.cell(2, 4).value()).toBe("Passed");
+  expect(filledSheet.cell(2, 5).value()).toBe("Passed");
+  expect(filledSheet.cell(2, 6).value()).toBe("The agent completed this case and covered the expected result evidence.");
+  expect(filledSheet.cell(2, 8).value()).toBe("evidence.png");
   expect(filledSheet.cell(3, 4).value()).toBe("Partial");
+  expect(filledSheet.cell(3, 5).value()).toBe("Manual Review Required");
+  expect(filledSheet.cell(3, 6).value()).toBe("The browser flow completed, but not every expected result was fully covered by evidence.");
   expect(mapping.result_column_by_sheet.Sheet1).toBe("D");
+  expect(mapping.output_columns_by_sheet.Sheet1).toEqual({
+    agent_result: "D",
+    failure_category: "E",
+    failure_summary: "F",
+    recommended_action: "G",
+    evidence: "H"
+  });
   expect(mapping.cases).toEqual([
     expect.objectContaining({
       run_id: "R6-test-run",
       case_execution_id: "R6-test-run:R6-B7.2-TC01",
       stable_id: "R6-B7.2-TC01",
       final_filled_status: "Passed",
-      filled_cell: "Sheet1!D2"
+      failure_category: "Passed",
+      filled_cell: "Sheet1!D2",
+      filled_cells: expect.objectContaining({
+        failure_category: "Sheet1!E2",
+        failure_summary: "Sheet1!F2",
+        recommended_action: "Sheet1!G2",
+        evidence: "Sheet1!H2"
+      })
     }),
     expect.objectContaining({
       run_id: "R6-test-run",
       case_execution_id: "R6-test-run:R6-B7.3-TC01",
       stable_id: "R6-B7.3-TC01",
       final_filled_status: "Partial",
+      failure_category: "Manual Review Required",
       filled_cell: "Sheet1!D3"
     })
   ]);

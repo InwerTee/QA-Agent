@@ -36,6 +36,8 @@ export interface RunPackageResult {
   prepared: PrepareResult;
   triage: TriageResult;
   prdKnowledgePath: string;
+  caseUnderstandingPath: string;
+  knowledgeMissingReportPath: string;
   selectedCaseIds: string[];
   processedCaseIds: string[];
   report: RunReport;
@@ -135,6 +137,8 @@ export async function runInputPackage(
     prepared,
     triage,
     prdKnowledgePath: prepared.prdKnowledgePath,
+    caseUnderstandingPath: prepared.caseUnderstandingPath,
+    knowledgeMissingReportPath: prepared.knowledgeMissingReportPath,
     selectedCaseIds,
     processedCaseIds: selectedCaseIds,
     report: runResult.report,

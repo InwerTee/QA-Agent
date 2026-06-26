@@ -58,27 +58,28 @@ export function buildTraceFromContract(
 export function buildNotExecutedTrace(
   testCase: NormalizedCase,
   reason: string,
-  testCaseIR?: TestCaseIR
+  testCaseIR?: TestCaseIR,
+  evidencePath?: string
 ): CaseExecutionTrace {
   const preconditionTrace = materializeTraceEntries(
     "precondition",
     [testCase.precondition],
     [],
-    undefined,
+    evidencePath,
     reason
   );
   const stepTrace = materializeTraceEntries(
     "test_step",
     testCase.steps,
     [],
-    undefined,
+    evidencePath,
     reason
   );
   const expectedTrace = materializeTraceEntries(
     "expected_result",
     testCase.expected_result,
     [],
-    undefined,
+    evidencePath,
     reason
   );
 
@@ -164,6 +165,7 @@ function materializeTraceEntries(
         source_text: sourceText,
         coverage: "not_executed",
         actual_check: "No automated check was executed for this source item.",
+        evidence_path: evidencePath,
         notes: notExecutedReason ? [notExecutedReason] : []
       };
     }

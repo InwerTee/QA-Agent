@@ -140,6 +140,16 @@
         flex-wrap: wrap;
       }
 
+      .result-actions {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        padding: 14px;
+        border: 1px solid rgba(37, 99, 235, 0.22);
+        border-radius: 8px;
+        background: #eff6ff;
+      }
+
       button,
       .download-link {
         min-height: 40px;
@@ -159,6 +169,42 @@
 
       button.primary:hover:not(:disabled) {
         background: var(--accent-hover);
+      }
+
+      .download-link.result-primary,
+      .result-actions button.result-secondary,
+      .download-link.result-secondary {
+        display: inline-flex;
+        min-height: 46px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 7px;
+        box-shadow: 0 8px 18px rgba(37, 99, 235, 0.12);
+        text-align: center;
+      }
+
+      .download-link.result-primary {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: white;
+      }
+
+      .download-link.result-primary:hover {
+        border-color: var(--accent-hover);
+        background: var(--accent-hover);
+      }
+
+      .result-actions button.result-secondary,
+      .download-link.result-secondary {
+        border-color: rgba(37, 99, 235, 0.24);
+        background: var(--surface);
+        color: #1e3a8a;
+      }
+
+      .result-actions button.result-secondary:hover:not(:disabled),
+      .download-link.result-secondary:hover {
+        border-color: rgba(37, 99, 235, 0.48);
+        background: #dbeafe;
       }
 
       button.secondary,
@@ -317,12 +363,31 @@
         min-width: 0;
       }
 
+      .failure-label,
+      .failure-copy {
+        display: grid;
+        gap: 3px;
+      }
+
+      .failure-label strong {
+        display: block;
+      }
+
+      .translation {
+        display: block;
+        color: #667085;
+        font-size: 12px;
+        font-weight: 500;
+        line-height: 1.35;
+      }
+
       .failure-count {
         color: var(--text);
         font-weight: 700;
       }
 
       .failure-action {
+        margin: 0;
         color: var(--muted);
         font-size: 12px;
         line-height: 1.45;
@@ -364,7 +429,8 @@
 
         .grid,
         .summary,
-        .failure-row {
+        .failure-row,
+        .result-actions {
           grid-template-columns: 1fr;
         }
 
@@ -446,12 +512,12 @@
 
         <section id="results" class="results" aria-label="Run results">
           <div class="summary" id="summary"></div>
-          <div id="failure-analysis" class="failure-analysis"></div>
-          <div class="actions">
-            <a id="filled-excel" class="download-link" href="#">Download filled Excel</a>
-            <a id="report-md" class="download-link" href="#">Download report</a>
-            <button id="open-folder" class="secondary" type="button">Open result folder</button>
+          <div class="actions result-actions">
+            <a id="filled-excel" class="download-link result-primary" href="#">Download filled Excel</a>
+            <a id="report-md" class="download-link result-secondary" href="#">Download report</a>
+            <button id="open-folder" class="secondary result-secondary" type="button">Open result folder</button>
           </div>
+          <div id="failure-analysis" class="failure-analysis"></div>
           <div class="paths" id="paths"></div>
         </section>
       </section>
@@ -647,7 +713,7 @@
             return `<div class="metric"><span>${key}</span><strong>${value}</strong></div>`;
           })
           .join("");
-        renderFailureAnalysis(result.failureAnalysis);
+        renderPilotOutput(result.pilotOutput, result.failureAnalysis);
 
         filledExcelLink.href = result.downloads.filledExcel;
         reportLink.href = result.downloads.reportMarkdown;
@@ -659,6 +725,8 @@
           `Execution readiness: ${escapeHtml(formatExecutionReadiness(result.executionReadiness))}`,
           `Filled Excel: ${escapeHtml(result.files.filledWorkbook)}`,
           `Report: ${escapeHtml(result.files.reportMarkdown)}`,
+          `Case understanding: ${escapeHtml(result.files.caseUnderstanding || "not available")}`,
+          `Knowledge missing report: ${escapeHtml(result.files.knowledgeMissingReport || "not available")}`,
           `Result folder: ${escapeHtml(result.files.resultFolder)}`,
           `Processed cases: ${escapeHtml(result.selectedCases.join(", "))}`
         ]
@@ -670,6 +738,127 @@
       function formatExecutionReadiness(readiness) {
         if (!readiness) return "not available";
         return `${Number(readiness.ready || 0)} ready / ${Number(readiness.blocked || 0)} blocked / ${Number(readiness.manual_review || 0)} review`;
+      }
+
+      function renderPilotOutput(pilotOutput, fallbackAnalysis) {
+        if (!pilotOutput || !pilotOutput.by_category) {
+          renderFailureAnalysis(fallbackAnalysis);
+          return;
+        }
+
+        const labels = {
+          product_bug: "Product Bug",
+          setup_data_issue: "Setup Data Issue",
+          environment_issue: "Environment Issue",
+          agent_understanding_gap: "Agent Understanding Gap",
+          recipe_missing: "Recipe Missing",
+          selector_or_script_issue: "Selector / Script Issue",
+          test_case_ambiguity: "Test Case Ambiguity",
+          manual_review_required: "Manual Review Required",
+          passed: "Passed"
+        };
+        const translations = {
+          product_bug: {
+            label: "产品问题",
+            hint: "疑似 Gro 实际行为与预期不一致，提交或修复前需要先查看证据。"
+          },
+          setup_data_issue: {
+            label: "测试数据问题",
+            hint: "缺少前置数据，或当前测试数据还不够稳定。"
+          },
+          environment_issue: {
+            label: "环境或账号问题",
+            hint: "登录、账号权限或 staging 环境配置需要先处理。"
+          },
+          agent_understanding_gap: {
+            label: "Agent 理解不足",
+            hint: "Agent 可能还没有正确理解模块、页面或操作目标。"
+          },
+          recipe_missing: {
+            label: "自动化能力缺失",
+            hint: "这些 case 需要先补充可复用的页面操作或断言能力，才能稳定自动执行。"
+          },
+          selector_or_script_issue: {
+            label: "脚本或定位问题",
+            hint: "Runner 可能需要改进 selector、页面定位或 Playwright 操作处理。"
+          },
+          test_case_ambiguity: {
+            label: "测试用例不清晰",
+            hint: "测试用例的前置条件、步骤或预期结果需要进一步明确。"
+          },
+          manual_review_required: {
+            label: "需要人工复核",
+            hint: "需要人工查看 evidence 后，再判断是否存在交付风险。"
+          },
+          passed: {
+            label: "通过",
+            hint: "当前没有需要立即处理的问题。"
+          }
+        };
+        const order = [
+          "product_bug",
+          "setup_data_issue",
+          "environment_issue",
+          "agent_understanding_gap",
+          "recipe_missing",
+          "selector_or_script_issue",
+          "test_case_ambiguity",
+          "manual_review_required",
+          "passed"
+        ];
+        const rows = order
+          .map((key) => ({
+            key,
+            label: labels[key] || key,
+            count: Number(pilotOutput.by_category[key] || 0)
+          }))
+          .filter((item) => item.count > 0)
+          .map((item) => {
+            const translation = translations[item.key] || { label: "", hint: "" };
+            return `
+              <div class="failure-row">
+                <div class="failure-label">
+                  <strong>${escapeHtml(item.label)}</strong>
+                  <span class="translation">${escapeHtml(translation.label)}</span>
+                </div>
+                <span class="failure-count">${item.count}</span>
+                <div class="failure-copy">
+                  <p class="failure-action">${escapeHtml(pilotCategoryHint(item.key))}</p>
+                  <span class="translation">${escapeHtml(translation.hint)}</span>
+                </div>
+              </div>
+            `;
+          });
+
+        failureAnalysis.innerHTML = `
+          <div class="failure-title">
+            <strong>
+              Pilot output categories
+              <span class="translation">试运行结果分类</span>
+            </strong>
+            <span>
+              ${Number(pilotOutput.attention_case_count || 0)} cases need attention
+              <span class="translation">${Number(pilotOutput.attention_case_count || 0)} 条用例需要关注</span>
+            </span>
+          </div>
+          <div class="failure-list">${rows.join("")}</div>
+        `;
+        failureAnalysis.classList.add("visible");
+      }
+
+      function pilotCategoryHint(category) {
+        const hints = {
+          product_bug: "Likely product behavior mismatch; review evidence before filing/fixing.",
+          setup_data_issue: "Prerequisite data is missing or not deterministic yet.",
+          environment_issue: "Login, account, permission, or staging setup needs attention.",
+          agent_understanding_gap: "The agent may not understand the module/page/action correctly.",
+          recipe_missing: "The case needs a reusable automation recipe before stable execution.",
+          selector_or_script_issue: "The runner likely needs selector or Playwright handling improvements.",
+          test_case_ambiguity: "The test case needs clearer precondition, step, or expected result.",
+          manual_review_required: "A human should review evidence before deciding delivery risk.",
+          passed: "No immediate action."
+        };
+        return hints[category] || "";
       }
 
       function renderFailureAnalysis(analysis) {

@@ -120,11 +120,14 @@ async function createMasterCampaign(
       ]
     };
   } catch (error) {
+    const evidencePath = await screenshot(session.page, runDir, `${testCase.stable_id}.failure.png`).catch(() => undefined);
     return toBlockedResult(
       testCase,
       error,
       "Unable to complete Master Campaign creation.",
-      runId
+      runId,
+      [],
+      evidencePath
     );
   } finally {
     if (shouldCloseSession) {
@@ -213,12 +216,14 @@ async function searchMasterCampaign(
           ]
     };
   } catch (error) {
+    const evidencePath = await screenshot(session.page, runDir, `${testCase.stable_id}.failure.png`).catch(() => undefined);
     return toBlockedResult(
       testCase,
       error,
       `Unable to verify search result for ${campaignName}.`,
       runId,
-      dataDependency
+      dataDependency,
+      evidencePath
     );
   } finally {
     if (shouldCloseSession) {
@@ -286,12 +291,14 @@ async function editMasterCampaignBasicInfo(
       ]
     };
   } catch (error) {
+    const evidencePath = await screenshot(session.page, runDir, `${testCase.stable_id}.failure.png`).catch(() => undefined);
     return toBlockedResult(
       testCase,
       error,
       `Unable to edit Basic Information for ${campaignName}.`,
       runId,
-      dataDependency
+      dataDependency,
+      evidencePath
     );
   } finally {
     if (shouldCloseSession) {
@@ -486,7 +493,8 @@ function toBlockedResult(
   error: unknown,
   actualResult: string,
   runId: string,
-  dependsOnData: TestDataReference[] = []
+  dependsOnData: TestDataReference[] = [],
+  evidencePath?: string
 ): CaseResult {
   const message = error instanceof Error ? error.message : String(error);
   const status = error instanceof QaBlockedError ? error.status : "SCRIPT_BLOCKED";
@@ -503,10 +511,11 @@ function toBlockedResult(
         : "Browser execution started but the executor could not complete the UI flow.",
     actual_result: actualResult,
     expected_result: testCase.expected_result,
+    evidence_path: evidencePath,
     failure_reason: message,
     created_test_data: [],
     depends_on_data: dependsOnData,
-    traceability: buildNotExecutedTrace(testCase, message),
+    traceability: buildNotExecutedTrace(testCase, message, undefined, evidencePath),
     notes: [
       status === "ENV_BLOCKED"
         ? "Treat this as environment/auth setup work, not a Gro product bug."

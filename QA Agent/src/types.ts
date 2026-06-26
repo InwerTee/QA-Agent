@@ -318,6 +318,105 @@ export interface PrdKnowledgeRunSummary {
   notes: string[];
 }
 
+export type GroKnowledgeLayerVersion = "gro_knowledge_layer.v1";
+export type KnowledgeGapSeverity = "blocker" | "warning" | "info";
+export type KnowledgeGapCode =
+  | "unknown_site"
+  | "unknown_module"
+  | "low_confidence_understanding"
+  | "prd_context_missing"
+  | "route_hint_missing"
+  | "setup_data_required"
+  | "recipe_missing"
+  | "manual_action"
+  | "blocked_action"
+  | "low_confidence_action"
+  | "manual_assertion"
+  | "blocked_assertion"
+  | "llm_unavailable"
+  | "llm_rejected"
+  | "llm_error";
+
+export interface KnowledgeGap {
+  code: KnowledgeGapCode;
+  severity: KnowledgeGapSeverity;
+  message: string;
+  source_type?: TestCaseIRSourceType;
+  source_index?: number;
+  source_text?: string;
+  recommended_next_action: string;
+}
+
+export interface CaseKnowledgeRecord {
+  case_id: string;
+  title: string;
+  source: {
+    workbook: string;
+    sheet: string;
+    row: number;
+  };
+  understanding: {
+    site: Site;
+    site_confidence: ResultConfidence;
+    module: string;
+    module_key: string;
+    module_confidence: ResultConfidence;
+    business_object: string;
+    business_action: string;
+    confidence: ResultConfidence;
+    route_hints: {
+      module_labels: string[];
+      candidate_routes: string[];
+      field_labels: string[];
+      action_labels: string[];
+    };
+    evidence: string[];
+  };
+  required_capabilities: string[];
+  preconditions: Array<{
+    kind: string;
+    text: string;
+  }>;
+  expected_assertions: Array<{
+    kind: string;
+    text: string;
+  }>;
+  test_case_ir: TestCaseIR;
+  knowledge_gaps: KnowledgeGap[];
+  notes: string[];
+}
+
+export interface GroKnowledgeLayerSummary {
+  total_cases: number;
+  cases_with_blockers: number;
+  cases_with_warnings: number;
+  by_site: Record<Site, number>;
+  by_module: Record<string, number>;
+  by_action: Record<string, number>;
+  by_gap_code: Partial<Record<KnowledgeGapCode, number>>;
+  llm: {
+    enabled: boolean;
+    model?: string;
+    accepted: number;
+    disabled: number;
+    unconfigured: number;
+    rejected: number;
+    error: number;
+    rules_only: number;
+  };
+}
+
+export interface GroKnowledgeLayer {
+  version: GroKnowledgeLayerVersion;
+  release: string;
+  title: string;
+  generated_at: string;
+  prd_context?: PrdKnowledgeRunSummary;
+  summary: GroKnowledgeLayerSummary;
+  cases: CaseKnowledgeRecord[];
+  notes: string[];
+}
+
 export interface SetupPlan {
   case_id: string;
   precondition: string;
@@ -343,6 +442,7 @@ export interface CaseResult {
   depends_on_data: TestDataReference[];
   traceability: CaseExecutionTrace;
   execution_readiness?: ExecutionReadinessDecision;
+  pilot_output?: PilotCaseOutput;
   notes: string[];
 }
 
@@ -355,9 +455,39 @@ export interface RunReport {
   case_results: CaseResult[];
   prd_context?: PrdKnowledgeRunSummary;
   execution_readiness?: ExecutionReadinessRunSummary;
+  pilot_output?: PilotOutputSummary;
   created_test_data: TestDataRecord[];
   summary: Record<QaStatus, number>;
   failure_analysis?: FailureAnalysis;
+}
+
+export type PilotFailureCategory =
+  | "passed"
+  | "product_bug"
+  | "setup_data_issue"
+  | "environment_issue"
+  | "agent_understanding_gap"
+  | "recipe_missing"
+  | "selector_or_script_issue"
+  | "test_case_ambiguity"
+  | "manual_review_required";
+
+export interface PilotCaseOutput {
+  category: PilotFailureCategory;
+  category_label: string;
+  developer_summary: string;
+  expected_summary: string;
+  actual_summary: string;
+  recommended_action: string;
+  evidence_path?: string;
+  owner_hint: string;
+}
+
+export interface PilotOutputSummary {
+  total_cases: number;
+  attention_case_count: number;
+  by_category: Record<PilotFailureCategory, number>;
+  top_recommended_actions: string[];
 }
 
 export type ExecutionReadinessStatus = "ready" | "blocked" | "manual_review";

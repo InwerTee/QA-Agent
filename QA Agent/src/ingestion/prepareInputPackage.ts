@@ -4,10 +4,15 @@ import readXlsxFile from "read-excel-file/node";
 import type { CellValue, Row, Sheet } from "read-excel-file/node";
 import type { AutomationStatus, CaseDependency, NormalizedCase, Site } from "../types.js";
 import {
+  buildGroKnowledgeLayer,
+  formatKnowledgeMissingReport
+} from "../knowledge/groKnowledgeLayer.js";
+import {
   buildPrdKnowledgePack,
   casePrdContextForOutput,
   summarizePrdKnowledge
 } from "../knowledge/prdKnowledge.js";
+import { loadRuntimeConfig } from "../runtime/config.js";
 import { inferModuleNameFromText } from "../understanding/caseUnderstanding.js";
 
 interface PrepareOptions {
@@ -23,6 +28,8 @@ export interface PrepareResult {
   manifestPath: string;
   casesPath: string;
   prdKnowledgePath: string;
+  caseUnderstandingPath: string;
+  knowledgeMissingReportPath: string;
   reportPath: string;
   caseCount: number;
   sheet: string;
@@ -104,6 +111,15 @@ export async function prepareInputPackage(
     ...testCase,
     prd_context: casePrdContextForOutput(testCase, prdKnowledge, relativePath(prdKnowledgePath))
   }));
+  const groKnowledgeLayer = await buildGroKnowledgeLayer(
+    {
+      release,
+      title,
+      cases,
+      prdKnowledge
+    },
+    loadRuntimeConfig()
+  );
 
   const manifest = buildManifest({
     release,
@@ -114,7 +130,10 @@ export async function prepareInputPackage(
     workbook,
     cases,
     prdKnowledgePath,
-    prdKnowledge
+    prdKnowledge,
+    caseUnderstandingPath: path.join(outDir, "case_understanding.json"),
+    knowledgeMissingReportPath: path.join(outDir, "knowledge_missing_report.md"),
+    groKnowledgeLayer
   });
   const report = formatIngestionReport({
     release,
@@ -124,16 +143,23 @@ export async function prepareInputPackage(
     workbook,
     cases,
     prdKnowledgePath,
-    prdKnowledge
+    prdKnowledge,
+    caseUnderstandingPath: path.join(outDir, "case_understanding.json"),
+    knowledgeMissingReportPath: path.join(outDir, "knowledge_missing_report.md"),
+    groKnowledgeLayer
   });
 
   const manifestPath = path.join(outDir, "manifest.json");
   const casesPath = path.join(outDir, "cases.normalized.json");
+  const caseUnderstandingPath = path.join(outDir, "case_understanding.json");
+  const knowledgeMissingReportPath = path.join(outDir, "knowledge_missing_report.md");
   const reportPath = path.join(outDir, "ingestion_report.md");
 
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   await writeFile(casesPath, `${JSON.stringify(cases, null, 2)}\n`);
   await writeFile(prdKnowledgePath, `${JSON.stringify(prdKnowledge, null, 2)}\n`);
+  await writeFile(caseUnderstandingPath, `${JSON.stringify(groKnowledgeLayer, null, 2)}\n`);
+  await writeFile(knowledgeMissingReportPath, formatKnowledgeMissingReport(groKnowledgeLayer));
   await writeFile(reportPath, report);
 
   return {
@@ -144,6 +170,8 @@ export async function prepareInputPackage(
     manifestPath,
     casesPath,
     prdKnowledgePath,
+    caseUnderstandingPath,
+    knowledgeMissingReportPath,
     reportPath,
     caseCount: cases.length,
     sheet: workbook.sheet,
@@ -695,6 +723,9 @@ function buildManifest(input: {
   cases: NormalizedCase[];
   prdKnowledgePath: string;
   prdKnowledge: Awaited<ReturnType<typeof buildPrdKnowledgePack>>;
+  caseUnderstandingPath: string;
+  knowledgeMissingReportPath: string;
+  groKnowledgeLayer: Awaited<ReturnType<typeof buildGroKnowledgeLayer>>;
 }): Record<string, unknown> {
   return {
     release: input.release,
@@ -713,6 +744,11 @@ function buildManifest(input: {
           warning: "No PRD file was found; knowledge pack was generated from workbook context only."
         },
     prd_knowledge: summarizePrdKnowledge(input.prdKnowledge),
+    gro_knowledge_layer: {
+      case_understanding: relativePath(input.caseUnderstandingPath),
+      knowledge_missing_report: relativePath(input.knowledgeMissingReportPath),
+      summary: input.groKnowledgeLayer.summary
+    },
     test_case_source: {
       workbook: relativePath(input.files.workbookPath),
       sheet: input.workbook.sheet,
@@ -743,6 +779,9 @@ function formatIngestionReport(input: {
   cases: NormalizedCase[];
   prdKnowledgePath: string;
   prdKnowledge: Awaited<ReturnType<typeof buildPrdKnowledgePack>>;
+  caseUnderstandingPath: string;
+  knowledgeMissingReportPath: string;
+  groKnowledgeLayer: Awaited<ReturnType<typeof buildGroKnowledgeLayer>>;
 }): string {
   const automation = summarizeAutomation(input.cases);
   const groups = Array.from(
@@ -759,6 +798,8 @@ function formatIngestionReport(input: {
 - Input package: \`${relativePath(input.inputDir)}\`
 - PRD: \`${input.files.prdPath ? relativePath(input.files.prdPath) : "not found"}\`
 - PRD knowledge: \`${relativePath(input.prdKnowledgePath)}\`
+- Case understanding: \`${relativePath(input.caseUnderstandingPath)}\`
+- Knowledge missing report: \`${relativePath(input.knowledgeMissingReportPath)}\`
 - Test cases: \`${relativePath(input.files.workbookPath)}\`
 - Sheet: \`${input.workbook.sheet}\`
 - Header row: ${input.workbook.headerRowIndex + 1}
@@ -774,6 +815,9 @@ function formatIngestionReport(input: {
 - PRD extraction: ${input.prdKnowledge.extraction.status} via ${input.prdKnowledge.extraction.method}
 - PRD modules: ${input.prdKnowledge.modules.map((module) => module.name).join(", ") || "none inferred"}
 - PRD pages: ${input.prdKnowledge.pages.slice(0, 8).map((page) => page.name).join(", ") || "none inferred"}
+- Knowledge blockers: ${input.groKnowledgeLayer.summary.cases_with_blockers}
+- Knowledge warnings: ${input.groKnowledgeLayer.summary.cases_with_warnings}
+- Understanding mode: ${input.groKnowledgeLayer.summary.llm.enabled ? "optional LLM enabled with local validation" : "local rules, no API"}
 
 ## Scenario Groups
 
@@ -792,5 +836,6 @@ ${input.cases
 - B7.x section rows are used to build stable IDs like \`${input.release}-B7.2-TC01\`.
 - Historical Excel status/evidence is preserved as source metadata only.
 - Cases outside the current R6 pilot executor are intentionally marked \`needs_mapping\` or \`manual_review\`.
+- v0.21 writes \`case_understanding.json\` before browser execution so Gro knowledge gaps are visible before running Playwright.
 `;
 }

@@ -126,7 +126,7 @@ export async function assessExecutionReadiness(
       automated_assertion_count: irBuild.ir.assertions.filter(isSupportedAssertion).length,
       issues,
       notes: [
-        "v0.20 conservative mode checks execution readiness before opening Playwright.",
+        "Conservative mode checks execution readiness before opening Playwright.",
         hasImplementedExecutor
           ? "Case is marked ready for an implemented executor, so conservative generic capability checks are informational only."
           : "Only cases with supported actions and checkable assertions enter browser execution.",

@@ -56,6 +56,8 @@ async function main(): Promise<void> {
     console.log(`Cases JSON: ${result.casesPath}`);
     console.log(`Manifest JSON: ${result.manifestPath}`);
     console.log(`PRD knowledge JSON: ${result.prdKnowledgePath}`);
+    console.log(`Case understanding JSON: ${result.caseUnderstandingPath}`);
+    console.log(`Knowledge missing report: ${result.knowledgeMissingReportPath}`);
     console.log(`Ingestion report: ${result.reportPath}`);
     console.log(JSON.stringify(result.automationSummary, null, 2));
     return;
@@ -91,6 +93,8 @@ async function main(): Promise<void> {
       caseIds: args.caseIds
     });
     console.log(`Prepared cases: ${result.prepared.casesPath}`);
+    console.log(`Case understanding: ${result.prepared.caseUnderstandingPath}`);
+    console.log(`Knowledge missing report: ${result.prepared.knowledgeMissingReportPath}`);
     console.log(`Triage report: ${result.triage.reportPath}`);
     console.log(`Selected cases: ${result.selectedCaseIds.join(", ")}`);
     console.log(`Report JSON: ${result.reportJsonPath}`);

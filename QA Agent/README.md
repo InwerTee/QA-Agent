@@ -2,6 +2,8 @@
 
 新版 Gro QA Agent 用来在 Paragon UAT 前,根据用户提供的 Paragon PRD 和 test cases,帮助 YU 在 staging 环境中做内部自测。
 
+当前定位是 QA Agent pilot,用于验证它能否进入开发 self-test 流程。面向 PM / 开发 / leader 的试点流程先看 [docs/pilot-workflow.md](docs/pilot-workflow.md)。
+
 最终使用方式应该很简单:同事把本次 release 的 PRD 和测试用例交给 agent,agent 读取、执行,然后输出结果报告。它不应该依赖本地 `参考文档/` 文件夹。
 
 第一版目标很小:先证明真实 Paragon test case workbook ingestion、浏览器执行、actual vs expected、结果回填和最小 evidence 这条链路能跑通。R6 Master Campaign 只是开发样例,不是长期架构中心。它不是完整 QA 平台,不接 Jam。当前会处理上传 workbook 中解析出的全部 case:已知流程可以走静态 executor,其他 case 会进入 dynamic runner,先做 case understanding 和页面探索,再尝试通用 Playwright 操作。
@@ -30,6 +32,7 @@ PRD + test case Excel -> normalized cases -> staging 执行 -> actual vs expecte
 
 ```text
 docs/
+  pilot-workflow.md         # PM / 开发试用 QA Agent pilot 的流程和成功标准
   workflow.md               # 正式输入/输出 workflow 说明
 
 inputs/R6/
@@ -144,7 +147,7 @@ http://127.0.0.1:4173
 - 哪些 case 需要先准备 deterministic fixture / API setup / backend control。
 - 哪些 case 更适合人工复核或先明确 evidence 策略。
 
-`export-results` 会读取某次 run 的 `report.json`,复制 Paragon 原 Excel,并在每个相关 sheet 的原始内容最右侧后一列写入一列 `Agent Result`。它只填最终状态,不把 actual result、failure reason、evidence 或 trace notes 写进用户看的 Excel。详细映射会单独保存为 `result_mapping.json`。
+`export-results` 会读取某次 run 的 `report.json`,复制 Paragon 原 Excel,并在每个相关 sheet 的原始内容最右侧追加 pilot 输出列。v0.22 起,用户可见 Excel 不只写最终状态,也会写 failure category、failure summary、recommended action 和 evidence path,方便开发直接看每条 case 为什么需要处理。详细映射会单独保存为 `result_mapping.json`。
 
 不要用 Gro 系统里的 `QA-*` campaign 名字判断某条 case 是否运行过。名字只是 test data 的 `display_name`;真正的运行身份以 `report.json` / `result_mapping.json` 里的 `run_id` 和 `case_execution_id` 为准。
 
@@ -169,13 +172,19 @@ reports/runs/<run-id>/result_mapping.json
 
 v0.9 增加了 General Gro Understanding Layer。每条 case 在执行前会被理解成结构化信息:目标 site、module、business object、action、precondition、expected assertion 和 required capability。Admin / Creator / Agency case 会按目标 site 使用对应本地配置和 storage state,再根据 module registry 尝试候选 route、菜单探索和通用动作执行。具体 case 仍可能因为缺少前置测试数据、有效邀请链接、验证码或更强断言能力而被标记为 blocked / manual review。
 
-v0.17 增加可选 LLM Test Case IR translator。默认不开启,agent 继续使用本地规则把 Paragon natural-language case 转成 Test Case IR。设置 `QA_LLM_ENABLED=true` 且提供 `OPENAI_API_KEY` 后,agent 会请求 OpenAI 生成候选 IR,再用本地 traceability validator 检查 `case_id`、`source_index`、`source_text` 和 step/expected 覆盖率。校验失败或 API 不可用时会自动回退到规则 IR,不会让模型自由生成 Playwright 脚本或直接判定 PASS。
+v0.17 曾预留可选 LLM Test Case IR translator,但默认不开启。当前 no-API 开发模式下,agent 使用本地规则把 Paragon natural-language case 转成 Test Case IR。即使未来重新启用可选 LLM,本地 traceability validator 仍然必须检查 `case_id`、`source_index`、`source_text` 和 step/expected 覆盖率;校验失败或 API 不可用时会自动回退到规则 IR,不会让模型自由生成 Playwright 脚本或直接判定 PASS。
 
 v0.18/v0.19 在不依赖 OpenAI API 的前提下让 PRD 进入 pipeline。`prepare` 会生成 `prd_knowledge.json`,从 PRD 文件名/文本、Excel case context 中保守提取 modules、pages、fields、actions 和 business rules。`run-package` 会把这份 knowledge pack 传给 triage 和 dynamic runner;case understanding 会用 PRD context 辅助判断目标 module、页面 label、字段和动作。Paragon test case 仍然是执行依据,PRD 只作为 disambiguation context。如果本机有 `pdftotext`,PDF PRD 会尝试抽取正文;否则使用文件名和测试用例上下文生成 partial knowledge。
 
+v0.21 增加 no-API Gro Knowledge Layer。`prepare` / `run-package` 会在浏览器执行前生成 `case_understanding.json` 和 `knowledge_missing_report.md`,记录每条 case 被理解成哪个 site/module/page/action、需要哪些 capabilities、Test Case IR 的本地规则理解结果,以及还缺哪些 Gro 知识或 recipe。这个版本不依赖 OpenAI API,也不需要 API key;重点是让 agent 先把“知道什么 / 不知道什么”讲清楚。
+
+v0.22 增加 Pilot Output & Failure Classification。`report.md`、网页结果和 filled Excel 会把每条 case 转成开发可读的输出:最终状态、失败分类、发生了什么、建议下一步、evidence 路径和 owner hint。这个版本的目标不是提高通过率,而是让 pilot 结果可以用于 self-test 反馈和交付质量讨论。
+
+v0.23 优化 pilot 输出体验。网页的 Pilot output categories 增加中文解释;结果按钮移动到分类模块上方并加亮;没有浏览器截图的 case 会用 `report.md#case-id` 作为 Evidence fallback;已经进入浏览器但中途失败的 R6 executor 会补 `*.failure.png` 截图。这个版本重点是让输出更适合拿给团队试用和反馈。
+
 如果 `.env` 还没有配置 staging URL 和账号,`run` 会生成 `ENV_BLOCKED` 报告,不会假装执行成功。
 
-可选 LLM 翻译配置:
+当前默认不使用 LLM。下面配置只作为未来可选接口保留,不是本阶段运行前提:
 
 ```bash
 QA_LLM_ENABLED=true
@@ -184,17 +193,20 @@ QA_LLM_MODEL=gpt-5.2
 QA_LLM_TIMEOUT_MS=20000
 ```
 
-LLM 只负责把测试用例翻译成结构化 Test Case IR。Playwright 执行仍然由本地 runner 控制,并且每个 IR node 必须回指原始 Excel 文本。
+如果未来重新启用 LLM,它也只能负责把测试用例翻译成结构化 Test Case IR。Playwright 执行仍然由本地 runner 控制,并且每个 IR node 必须回指原始 Excel 文本。
 
 ## Excel 结果回填
 
-v0.5 的用户可见输出是 Paragon Excel 的复制件,不是工程化 debug 表。规则:
+用户可见输出是 Paragon Excel 的复制件,不是工程化 debug 表。规则:
 
 - 原始 Paragon Excel 不修改。
 - 复制件保留原 sheet、原行、原格式。
-- 每个相关 sheet 只新增一列 `Agent Result`。
-- `Agent Result` 写在原始内容的最右侧后一列。
-- 只写最终状态: `Passed`, `Partial`, `Failed`, `Setup Blocked`, `Agent Blocked`, `Script Blocked`, `Env Blocked`, `Review`。
+- 每个相关 sheet 在原始内容最右侧追加输出列。
+- `Agent Result` 仍然写最终状态: `Passed`, `Partial`, `Failed`, `Setup Blocked`, `Agent Blocked`, `Script Blocked`, `Env Blocked`, `Review`。
+- `Failure Category` 写 pilot 分类,例如 `Product Bug`、`Setup Data Issue`、`Agent Understanding Gap`、`Recipe Missing`、`Selector / Script Issue`。
+- `Failure Summary` 写给开发看的简短问题描述。
+- `Recommended Action` 写建议下一步。
+- `Evidence` 写对应截图或 evidence 路径。
 
 状态映射:
 
@@ -209,7 +221,7 @@ PASS + full trace coverage -> Passed
 PASS + partial/not-covered trace coverage -> Partial
 ```
 
-`result_mapping.json` 是 agent 内部账本,记录 stable id、source row、coverage summary、actual result、failure reason、evidence 和最终写入的 Excel cell。普通用户主要看 `*.agent-filled.xlsx`。
+`result_mapping.json` 是 agent 内部账本,记录 stable id、source row、coverage summary、actual result、failure reason、pilot 分类、建议动作、evidence 和最终写入的 Excel cells。普通用户主要看 `*.agent-filled.xlsx`。
 
 ## 真实浏览器执行
 

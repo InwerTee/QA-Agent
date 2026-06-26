@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { buildPilotCaseOutput } from "../reporting/pilotOutput.js";
 import type {
   CaseResult,
   QaStatus,
@@ -40,6 +41,7 @@ export interface ResultMapping {
   source_workbook: string;
   output_workbook: string;
   result_column_by_sheet: Record<string, string>;
+  output_columns_by_sheet: Record<string, Record<string, string>>;
   cases: ResultMappingCase[];
 }
 
@@ -55,10 +57,14 @@ export interface ResultMappingCase {
   classification_reason?: string;
   coverage_summary: TraceCoverageSummary;
   final_filled_status: FilledResultStatus;
+  failure_category: string;
+  failure_summary: string;
+  recommended_action: string;
   actual_result: string;
   failure_reason?: string;
   evidence_path?: string;
   filled_cell: string;
+  filled_cells: Record<string, string>;
 }
 
 interface XlsxPopulateModule {
@@ -104,6 +110,7 @@ export async function exportResultsToWorkbook(
   const workbook = await XlsxPopulate.fromFileAsync(sourceWorkbook);
   const casesBySheet = groupCasesBySheet(report.case_results);
   const resultColumnBySheet: Record<string, string> = {};
+  const outputColumnsBySheet: Record<string, Record<string, string>> = {};
   const mappingCases: ResultMappingCase[] = [];
 
   for (const [sheetName, caseResults] of casesBySheet) {
@@ -113,15 +120,41 @@ export async function exportResultsToWorkbook(
     }
 
     const resultColumn = findContentMaxColumn(sheet) + 1;
+    const outputColumns = {
+      result: resultColumn,
+      category: resultColumn + 1,
+      summary: resultColumn + 2,
+      recommendedAction: resultColumn + 3,
+      evidence: resultColumn + 4
+    };
     const headerRow = findHeaderRow(sheet, caseResults);
-    const headerCell = sheet.cell(headerRow, resultColumn);
-    headerCell.value("Agent Result");
+    sheet.cell(headerRow, outputColumns.result).value("Agent Result");
+    sheet.cell(headerRow, outputColumns.category).value("Failure Category");
+    sheet.cell(headerRow, outputColumns.summary).value("Failure Summary");
+    sheet.cell(headerRow, outputColumns.recommendedAction).value("Recommended Action");
+    sheet.cell(headerRow, outputColumns.evidence).value("Evidence");
     resultColumnBySheet[sheetName] = columnName(resultColumn);
+    outputColumnsBySheet[sheetName] = {
+      agent_result: columnName(outputColumns.result),
+      failure_category: columnName(outputColumns.category),
+      failure_summary: columnName(outputColumns.summary),
+      recommended_action: columnName(outputColumns.recommendedAction),
+      evidence: columnName(outputColumns.evidence)
+    };
 
     for (const caseResult of caseResults) {
       const finalStatus = deriveFilledStatus(caseResult);
-      const resultCell = sheet.cell(caseResult.traceability.source_row, resultColumn);
+      const pilotOutput = caseResult.pilot_output ?? buildPilotCaseOutput(caseResult);
+      const resultCell = sheet.cell(caseResult.traceability.source_row, outputColumns.result);
+      const categoryCell = sheet.cell(caseResult.traceability.source_row, outputColumns.category);
+      const summaryCell = sheet.cell(caseResult.traceability.source_row, outputColumns.summary);
+      const recommendedCell = sheet.cell(caseResult.traceability.source_row, outputColumns.recommendedAction);
+      const evidenceCell = sheet.cell(caseResult.traceability.source_row, outputColumns.evidence);
       resultCell.value(finalStatus);
+      categoryCell.value(pilotOutput.category_label);
+      summaryCell.value(pilotOutput.developer_summary);
+      recommendedCell.value(pilotOutput.recommended_action);
+      evidenceCell.value(pilotOutput.evidence_path ?? "");
       mappingCases.push({
         run_id: caseResult.run_id,
         case_execution_id: caseResult.case_execution_id,
@@ -134,10 +167,20 @@ export async function exportResultsToWorkbook(
         classification_reason: caseResult.classification_reason,
         coverage_summary: caseResult.traceability.coverage_summary,
         final_filled_status: finalStatus,
+        failure_category: pilotOutput.category_label,
+        failure_summary: pilotOutput.developer_summary,
+        recommended_action: pilotOutput.recommended_action,
         actual_result: caseResult.actual_result,
         failure_reason: caseResult.failure_reason,
         evidence_path: caseResult.evidence_path,
-        filled_cell: `${sheetName}!${resultCell.address()}`
+        filled_cell: `${sheetName}!${resultCell.address()}`,
+        filled_cells: {
+          agent_result: `${sheetName}!${resultCell.address()}`,
+          failure_category: `${sheetName}!${categoryCell.address()}`,
+          failure_summary: `${sheetName}!${summaryCell.address()}`,
+          recommended_action: `${sheetName}!${recommendedCell.address()}`,
+          evidence: `${sheetName}!${evidenceCell.address()}`
+        }
       });
     }
   }
@@ -151,6 +194,7 @@ export async function exportResultsToWorkbook(
     source_workbook: sourceWorkbook,
     output_workbook: outputWorkbookPath,
     result_column_by_sheet: resultColumnBySheet,
+    output_columns_by_sheet: outputColumnsBySheet,
     cases: mappingCases
   };
 

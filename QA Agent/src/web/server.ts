@@ -34,6 +34,8 @@ interface WebRunRecord {
   filledWorkbookPath: string;
   reportMarkdownPath: string;
   resultMappingPath: string;
+  caseUnderstandingPath: string;
+  knowledgeMissingReportPath: string;
 }
 
 interface JsonResponse {
@@ -44,11 +46,14 @@ interface JsonResponse {
   selectedCases: string[];
   summary: RunPackageResult["report"]["summary"];
   executionReadiness?: RunPackageResult["report"]["execution_readiness"];
+  pilotOutput?: RunPackageResult["report"]["pilot_output"];
   failureAnalysis?: RunPackageResult["report"]["failure_analysis"];
   files: {
     filledWorkbook: string;
     reportMarkdown: string;
     resultMapping: string;
+    caseUnderstanding: string;
+    knowledgeMissingReport: string;
     resultFolder: string;
   };
   downloads: {
@@ -310,7 +315,9 @@ function registerRun(records: Map<string, WebRunRecord>, result: RunPackageResul
     resultFolder,
     filledWorkbookPath: path.resolve(result.filledWorkbookPath),
     reportMarkdownPath: path.resolve(result.reportMarkdownPath),
-    resultMappingPath: path.resolve(result.resultMappingPath)
+    resultMappingPath: path.resolve(result.resultMappingPath),
+    caseUnderstandingPath: path.resolve(result.caseUnderstandingPath),
+    knowledgeMissingReportPath: path.resolve(result.knowledgeMissingReportPath)
   };
   records.set(runId, record);
   return record;
@@ -325,11 +332,14 @@ function buildRunResponse(result: RunPackageResult, record: WebRunRecord): JsonR
     selectedCases: result.selectedCaseIds,
     summary: result.report.summary,
     executionReadiness: result.report.execution_readiness,
+    pilotOutput: result.report.pilot_output,
     failureAnalysis: result.report.failure_analysis,
     files: {
       filledWorkbook: record.filledWorkbookPath,
       reportMarkdown: record.reportMarkdownPath,
       resultMapping: record.resultMappingPath,
+      caseUnderstanding: record.caseUnderstandingPath,
+      knowledgeMissingReport: record.knowledgeMissingReportPath,
       resultFolder: record.resultFolder
     },
     downloads: {
